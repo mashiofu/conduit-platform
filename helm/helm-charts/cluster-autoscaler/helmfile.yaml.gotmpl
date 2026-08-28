@@ -11,5 +11,11 @@ releases:
     # compatibility policy supports the cluster's minor version +/- a
     # couple, not arbitrary skew.
     version: 9.59.0
+    # wait: true for consistency with the other add-on releases in this
+    # helmfile (see aws-load-balancer-controller's comment) - this chart
+    # doesn't register a cluster-wide admission webhook today, so it
+    # isn't gating anything downstream yet, but making every release wait
+    # for its own pods keeps that invariant true if that ever changes.
+    wait: true
     values:
       - values.yaml.gotmpl

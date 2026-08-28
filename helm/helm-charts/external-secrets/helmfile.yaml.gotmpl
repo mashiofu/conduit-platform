@@ -8,5 +8,10 @@ releases:
     chart: external-secrets/external-secrets
     # Checked via `helm search repo external-secrets/external-secrets` on 2026-08-26.
     version: 2.9.0
+    # wait: true - same hazard as aws-load-balancer-controller's release
+    # (see its comment): this chart's own webhook (for ExternalSecret/
+    # SecretStore validation) needs its pod Ready before the `backend`
+    # release later in the list can safely create its ExternalSecret.
+    wait: true
     values:
       - values.yaml.gotmpl

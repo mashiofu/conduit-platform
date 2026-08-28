@@ -7,5 +7,16 @@ releases:
     chart: eks/aws-load-balancer-controller
     # Checked via `helm search repo eks-charts/aws-load-balancer-controller` on 2026-08-26.
     version: 3.5.0
+    # wait: true - this chart's mutating webhook for Service objects is
+    # cluster-wide and registered as soon as the k8s objects are created,
+    # but the controller pod backing it takes longer to actually go
+    # Ready. Without --wait, helmfile moves on to the next release
+    # (external-secrets, also creating a Service) before the webhook has
+    # any endpoints, and that Service creation fails with "no endpoints
+    # available for service aws-load-balancer-webhook-service". Hit this
+    # live on 2026-08-28; confirmed via `kubectl get endpoints -n
+    # kube-system aws-load-balancer-webhook-service` that the pods just
+    # needed ~2 more minutes than the bare helm install call waited for.
+    wait: true
     values:
       - values.yaml.gotmpl

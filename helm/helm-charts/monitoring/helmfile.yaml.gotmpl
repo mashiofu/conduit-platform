@@ -12,5 +12,17 @@ releases:
     # and alert rules are a later phase (docs/design-decisions.md), not
     # scope creep here.
     version: 88.5.4
+    # wait: true - same reasoning as aws-load-balancer-controller's release:
+    # kube-prometheus-stack's Prometheus Operator can validate PrometheusRule/
+    # ServiceMonitor objects via its own admission webhook, which the
+    # `backend` release later in the list may create. Longer timeout than
+    # the other add-ons because this chart brings up the most pods/images
+    # in one release (Operator, Prometheus, Alertmanager, Grafana,
+    # kube-state-metrics, node-exporter daemonset) - not yet observed
+    # timing out on the default 300s, but this one has the least margin
+    # of any release here, so giving it more room up front is cheaper
+    # than debugging a timeout later.
+    wait: true
+    timeout: 600
     values:
       - values.yaml.gotmpl

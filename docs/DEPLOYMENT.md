@@ -95,11 +95,23 @@ use_lockfile = true
 Uncomment the `backend "s3" {}` block in `versions.tf` (it's the last thing in that file, commented out with instructions right above it) - leave it **empty**. Every real value comes from `backend.hcl` via `-backend-config` below; `versions.tf` is committed to git, so your bucket name should never end up hardcoded in it.
 
 ```bash
-terraform workspace select dev
 terraform init -backend-config=backend.hcl -migrate-state
 ```
 
-Answer `yes` to "copy existing state to the new backend." (The `dev`/`staging`/`prod` workspaces created earlier for testing are all empty - nothing's actually been applied yet - so there's nothing meaningful to lose here either way.)
+If prompted to copy existing state to the new backend, answer `yes` - though if this is a genuinely fresh clone there won't be any local state to ask about at all.
+
+**Now select the workspace - after this init, not before.** A brand-new S3 bucket has no workspaces of its own yet, so switching backends resets you to `default` regardless of what you had selected a moment ago (even if you'd already created `dev`/`staging`/`prod` locally, e.g. from earlier testing against a local backend - those don't carry over to a different backend just by name):
+
+```bash
+terraform workspace show
+```
+
+If that isn't `dev`, check what actually exists under this backend and create it if needed:
+```bash
+terraform workspace list
+terraform workspace new dev      # if `dev` isn't in that list
+# or: terraform workspace select dev   # if it already is (e.g. re-running this)
+```
 
 ## 3. Apply Terraform - this is the real infrastructure
 

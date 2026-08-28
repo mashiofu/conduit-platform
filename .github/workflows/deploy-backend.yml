@@ -36,6 +36,14 @@ jobs:
           curl -fsSL -o helm.tar.gz https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz
           tar -xzf helm.tar.gz linux-amd64/helm
           sudo mv linux-amd64/helm /usr/local/bin/helm
+          # helmfile apply/diff shell out to `helm diff` internally - not a
+          # built-in Helm command, a plugin (databus23/helm-diff) that has
+          # to be installed on top (see docs/DEPLOYMENT.md's Prerequisites
+          # table for the same requirement locally). No --verify=false here
+          # like the local instructions need - that's specifically Helm 4's
+          # default plugin-signature verification, and this installs Helm
+          # 3.16.2, which doesn't enforce it.
+          helm plugin install https://github.com/databus23/helm-diff
           curl -fsSL -o helmfile.tar.gz https://github.com/helmfile/helmfile/releases/download/v1.7.4/helmfile_1.7.4_linux_amd64.tar.gz
           tar -xzf helmfile.tar.gz helmfile
           sudo mv helmfile /usr/local/bin/helmfile

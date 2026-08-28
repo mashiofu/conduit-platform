@@ -118,8 +118,19 @@ jobs:
         # final Helm chart values, bypassing that layer entirely -
         # verified via `helmfile template --set image.tag=...` rendering
         # the correct image reference.
+        #
+        # -l name=conduit-backend is not optional here: --set applies to
+        # every release helmfile processes, not just this one, and the
+        # aws-load-balancer-controller chart happens to have its own
+        # unrelated `image.tag` field. Without this selector, the very
+        # first run of the fix above overrode LB controller's image to
+        # this same backend git-SHA tag, which obviously doesn't exist
+        # in *its* registry - stuck one replica in ImagePullBackOff and
+        # failed that release's own upgrade, live, on a workflow whose
+        # only job is supposed to be deploying the backend.
         run: |
           helmfile -e ${{ github.event.client_payload.environment }} apply \
+            -l name=conduit-backend \
             --set image.tag=${{ github.event.client_payload.image_tag }}
 
       - name: Discover the backend's ALB hostname

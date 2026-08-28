@@ -12,3 +12,26 @@ resources:
   requests:
     cpu: 100m
     memory: 128Mi
+
+# keepTLSSecret: without this, the chart's webhookCerts helper
+# (templates/_helpers.tpl) calls genCA/genSignedCert unconditionally on
+# every single render - not gated on whether a valid cert already
+# exists - so every `helm upgrade --install` of this release (even a
+# no-op one from our own values) mints a brand-new random self-signed
+# CA/cert and repatches the webhook's caBundle. The 2 controller
+# replicas each pick up that new cert off their mounted Secret volume
+# independently (~10s poll each, not synchronized), so any Service (or
+# other webhook-intercepted object) created cluster-wide in the short
+# gap between "caBundle updated" and "both replicas reloaded" fails
+# with `x509: certificate signed by unknown authority`. Hit this live
+# on 2026-08-28 - first on cluster-autoscaler's Service, then again
+# ~9 minutes later wiping out kube-prometheus-stack's whole release
+# (11/11 Service objects, both replicas) on the very next apply, which
+# is what proved this isn't a rare one-off: it recurs on every apply
+# that actually re-runs this release, i.e. effectively every apply,
+# since the perpetually-regenerated Secret content means helm-diff
+# never sees this release as unchanged. `true` makes the chart's own
+# `lookup`-gated branch reuse the existing Secret's cert instead of
+# regenerating it - a fresh cert is still generated on the genuine
+# first install, when no Secret exists yet for `lookup` to find.
+keepTLSSecret: true

@@ -33,17 +33,26 @@ jobs:
 
       - name: Install helm/helmfile
         run: |
-          curl -fsSL -o helm.tar.gz https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz
+          # Pinned to the exact Helm + helm-diff combination actually
+          # tested locally all along (`helm version` / `helm plugin
+          # list`), not just "whatever the latest release of each is" -
+          # helm-diff's plugin.yaml schema has moved on since Helm 3.x
+          # (a "platformHooks" field newer Helm expects), so an
+          # unpinned `helm plugin install` against an older Helm here
+          # failed with "unknown field platformHooks" the first time
+          # this workflow got far enough to actually run it.
+          curl -fsSL -o helm.tar.gz https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz
           tar -xzf helm.tar.gz linux-amd64/helm
           sudo mv linux-amd64/helm /usr/local/bin/helm
           # helmfile apply/diff shell out to `helm diff` internally - not a
           # built-in Helm command, a plugin (databus23/helm-diff) that has
           # to be installed on top (see docs/DEPLOYMENT.md's Prerequisites
-          # table for the same requirement locally). No --verify=false here
-          # like the local instructions need - that's specifically Helm 4's
-          # default plugin-signature verification, and this installs Helm
-          # 3.16.2, which doesn't enforce it.
-          helm plugin install https://github.com/databus23/helm-diff
+          # table for the same requirement locally). --verify=false because
+          # this plugin doesn't publish the provenance files Helm 4's
+          # default plugin verification expects - not a reason to distrust
+          # it, just a widely-used plugin that hasn't caught up to a newer
+          # Helm requirement yet (same as the local Prerequisites note).
+          helm plugin install https://github.com/databus23/helm-diff --version 3.15.11 --verify=false
           curl -fsSL -o helmfile.tar.gz https://github.com/helmfile/helmfile/releases/download/v1.7.4/helmfile_1.7.4_linux_amd64.tar.gz
           tar -xzf helmfile.tar.gz helmfile
           sudo mv helmfile /usr/local/bin/helmfile

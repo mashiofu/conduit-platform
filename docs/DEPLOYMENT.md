@@ -2,9 +2,50 @@
 
 Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see `docs/design-decisions.md`: standing up real AWS infrastructure was a deliberate, separate decision from writing the code).
 
-Nothing in this guide is specific to any one person - it's written for whoever forked these three repos to their own GitHub account, into their own AWS account. That's step 0.
+Nothing in this guide is specific to any one person - it's written for whoever forked these three repos to their own GitHub account, into their own AWS account.
 
 **Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see `docs/cost-estimate.md` (~$7.50/day for `dev`).
+
+---
+
+## Prerequisites
+
+### Get the three repos
+
+Clone all three **as siblings under the same parent directory** - not optional, two real things depend on this exact layout: `docker-compose.yml` (local dev, optional) builds the other two repos via relative paths (`../golang-gin-realworld-example-app`, `../angular-realworld-example-app`), and step 7 below `cd`s between all three the same way.
+
+```bash
+mkdir -p ~/conduit && cd ~/conduit
+
+git clone https://github.com/<your-github-username>/conduit-platform.git
+git clone https://github.com/<your-github-username>/golang-gin-realworld-example-app.git
+git clone https://github.com/<your-github-username>/angular-realworld-example-app.git
+```
+
+You should end up with:
+```
+conduit/
+  conduit-platform/
+  golang-gin-realworld-example-app/
+  angular-realworld-example-app/
+```
+
+(Renamed a fork? Fine - just use the name you actually used, and set it in `deploy.env` in step 0 below; `BACKEND_REPO`/`FRONTEND_REPO`/`PLATFORM_REPO` are exactly what make that configurable.)
+
+### Install these first
+
+| Tool | Version | Used for |
+|---|---|---|
+| [Terraform](https://developer.hashicorp.com/terraform/install) | `>= 1.10` | Every `terraform` command below - `1.10` specifically for S3 native state locking (`use_lockfile`), no DynamoDB table needed |
+| [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) | v2 | Everything - Terraform's provider, `aws eks update-kubeconfig`, every verification step. Configure it with credentials broad enough to create IAM roles/policies, VPCs, EKS, RDS, etc. - a personal sandbox account with admin access is the realistic expectation here, not a tightly-scoped IAM user |
+| [Helm](https://helm.sh/docs/intro/install/) | 3.12+ (built/tested against 4.2.4) | Helmfile's underlying engine |
+| [Helmfile](https://github.com/helmfile/helmfile#installation) | built/tested against 1.7.4 | Installing/upgrading every chart in `helm/` |
+| [kubectl](https://kubernetes.io/docs/tasks/tools/) | within one minor version of 1.34 (the cluster's version, per standard kubectl/server skew policy) | Verifying pods/ingress after a deploy |
+| [gh CLI](https://cli.github.com/), authenticated (`gh auth login`) | any recent version | The GitHub Environment sync script, setting secrets, watching workflow runs |
+| [jq](https://jqlang.github.io/jq/) | any recent version | Parsing `terraform output -json` in the sync scripts |
+| git | any recent version | Obviously |
+
+Docker is **not** required to follow this guide - image builds happen inside GitHub Actions, not on your machine. It only matters if you also want to run the stack locally via `conduit-platform/docker-compose.yml`.
 
 ---
 
@@ -22,8 +63,6 @@ source deploy.env
 ```
 
 Every command below assumes this has been done - none of them hardcode an AWS profile, GitHub org, or bucket name. If a command fails because a variable is unset, you skipped this step (or opened a new terminal without re-sourcing it).
-
-Assumes you're in `~/incode-take-home-task/` (or wherever) with all three repos as sibling directories.
 
 ## 1. Bootstrap remote Terraform state
 
@@ -118,34 +157,31 @@ kubectl get pods -A
 ```
 Expect pods in `kube-system` (LB controller, cluster-autoscaler), `external-secrets`, and `monitoring` (Prometheus/Grafana/Alertmanager), all `Running`.
 
-## 7. Push all three repos to GitHub
+## 7. Push any changes of your own
 
-Everything's been sitting uncommitted, so review before committing:
+If you cloned all three repos fresh per the Prerequisites section, this is a no-op - everything the deploy needs is already committed and pushed. This step only matters if you've since made your *own* edits (e.g. adjusting `env_config` in `terraform/live/main.tf`, or anything else):
 
 ```bash
-cd ../../conduit-platform
-git add -A && git status   # review, then:
-git commit -m "Full platform: Terraform, Helm/Helmfile, CI/CD, observability"
-git push -u origin main
-
-cd ../golang-gin-realworld-example-app
-git add -A && git status
-git commit -m "Add Postgres support, Prometheus metrics, Redis cache, Dockerfile, CI/CD"
+cd ../../conduit-platform   # back to its root - step 6 left you inside conduit-platform/helm
+git add -A && git status   # review what's actually changed, then:
+git commit -m "..."
 git push origin main
 
-cd ../angular-realworld-example-app
-git add -A && git status
-git commit -m "Runtime-configurable API URL, zone.js fix, Dockerfile, CI/CD"
-git push origin main
+# repeat for the other two repos if you touched them too
+cd ../golang-gin-realworld-example-app && git add -A && git status
+cd ../angular-realworld-example-app && git add -A && git status
 ```
 
 ## 8. Let the real pipeline deploy the backend, then the frontend
 
-Pushing to `$BACKEND_REPO`'s `main` branch (step 7 already did this) triggers `cd.yml` automatically: build → test → push to ECR → `repository_dispatch` → `conduit-platform`'s `deploy-backend.yml` runs `helmfile apply` for the backend, waits for the ALB, runs the k6 smoke+perf check, and publishes the ALB hostname to SSM.
+`cd.yml` on a push to `main` is what does the actual deploy: build → test → push to ECR → `repository_dispatch` → `conduit-platform`'s `deploy-backend.yml` runs `helmfile apply` for the backend, waits for the ALB, runs the k6 smoke+perf check, and publishes the ALB hostname to SSM. If `main` hasn't moved since before step 4 (the `dev` GitHub Environment didn't exist yet, so any earlier run of this failed fast), trigger it explicitly rather than waiting for a push that isn't coming:
 
-**Watch it**: `gh run watch --repo "$GITHUB_ORG/$BACKEND_REPO"` (or the Actions tab in the browser).
+```bash
+gh workflow run cd.yml --repo "$GITHUB_ORG/$BACKEND_REPO"
+gh run watch --repo "$GITHUB_ORG/$BACKEND_REPO"
+```
 
-Once that finishes, the frontend needs to pick up the now-published backend URL. Its own push in step 7 may have run *before* the backend URL existed - if so, just re-run it:
+Once that finishes, do the same for the frontend so it picks up the now-published backend URL:
 ```bash
 gh workflow run cd.yml --repo "$GITHUB_ORG/$FRONTEND_REPO"
 gh run watch --repo "$GITHUB_ORG/$FRONTEND_REPO"

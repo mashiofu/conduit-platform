@@ -1,0 +1,40 @@
+{{- if .Values.networkPolicy.enabled }}
+# Enforcement requires the VPC CNI's network policy feature enabled on
+# the vpc-cni EKS addon (see terraform/modules/eks) - without that, this
+# manifest applies cleanly but doesn't actually restrict anything.
+#
+# Ingress is deliberately open on the app port only, not scoped to a
+# source: the ALB (target-type "ip") sends traffic directly to pod IPs
+# from ENIs outside the pod network, so there's no stable
+# podSelector/ipBlock that actually means "from the ALB". Egress is the
+# real boundary here - DNS, Postgres, Redis, nothing else.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "conduit-backend.fullname" . }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "conduit-backend.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 5432
+    - ports:
+        - protocol: TCP
+          port: 6379
+{{- end }}

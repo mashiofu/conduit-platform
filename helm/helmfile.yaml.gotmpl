@@ -1,0 +1,28 @@
+bases:
+  - environments.yaml
+
+# Composition: each platform add-on is its own self-contained mini-helmfile
+# under helm-charts/, so adding a fifth add-on later means adding one
+# directory + one line here, not editing a monolithic release list.
+#
+# Each entry re-lists the same values files environments.yaml already
+# defines for this environment. That's not redundant by choice - tested
+# empirically (see docs/design-decisions.md) that a nested helmfile does
+# NOT automatically inherit the parent's merged environment values in
+# this Helmfile version; only the environment *name* carries down. The
+# `values:` list here is what actually carries the values themselves into
+# each sub-helmfile.
+helmfiles:
+  - path: helm-charts/aws-load-balancer-controller/helmfile.yaml.gotmpl
+    values: &envValues
+      - common.yaml
+      - {{ .Environment.Name }}.yaml
+      - {{ .Environment.Name }}.generated.yaml
+  - path: helm-charts/external-secrets/helmfile.yaml.gotmpl
+    values: *envValues
+  - path: helm-charts/cluster-autoscaler/helmfile.yaml.gotmpl
+    values: *envValues
+  - path: helm-charts/monitoring/helmfile.yaml.gotmpl
+    values: *envValues
+  - path: helm-charts/backend/helmfile.yaml.gotmpl
+    values: *envValues

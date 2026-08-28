@@ -1,0 +1,12 @@
+bases:
+  - repositories.yaml.gotmpl
+
+releases:
+  - name: external-secrets
+    namespace: external-secrets
+    createNamespace: true
+    chart: external-secrets/external-secrets
+    # Checked via `helm search repo external-secrets/external-secrets` on 2026-08-26.
+    version: 2.9.0
+    values:
+      - values.yaml.gotmpl

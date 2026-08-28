@@ -1,0 +1,60 @@
+# Defaults - the backend Helmfile release (../helm-charts/backend/) overrides
+# the per-environment ones (image.repository, replica counts, aws.*) from
+# Terraform outputs and common.yaml/<env>.yaml. Nothing here should need
+# hand-editing per environment; that's what values.yaml.gotmpl is for.
+
+image:
+  repository: "" # set from terraform output ecr_backend_repository_url
+  tag: "latest" # set by CI to the deployed commit's git SHA
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  port: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  name: conduit-backend
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+
+serviceMonitor:
+  enabled: true
+
+alerts:
+  enabled: true
+
+grafanaDashboard:
+  enabled: true
+
+# All of aws.* is bridged in from Terraform outputs via
+# scripts/generate-terraform-values.sh - see helm-charts/backend/values.yaml.gotmpl.
+aws:
+  region: ""
+  rdsSecretArn: ""
+  rdsEndpoint: "" # RDS's own `endpoint` attribute is already "host:port"
+  rdsDatabaseName: ""
+  redisAddr: ""
+  ssmJwtSecretPath: "" # e.g. /conduit/dev/JWT_SECRET - constructed, not a TF output (see values.yaml.gotmpl)

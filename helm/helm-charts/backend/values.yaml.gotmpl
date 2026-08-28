@@ -1,0 +1,19 @@
+image:
+  repository: {{ .Values.ecrBackendRepositoryUrl }}
+  {{- if .Values.imageTag }}
+  tag: {{ .Values.imageTag }}
+  {{- end }}
+
+replicaCount: {{ .Values.backend.minReplicas }}
+
+autoscaling:
+  minReplicas: {{ .Values.backend.minReplicas }}
+  maxReplicas: {{ .Values.backend.maxReplicas }}
+
+aws:
+  region: {{ .Values.awsRegion }}
+  rdsSecretArn: {{ .Values.rdsSecretArn }}
+  rdsEndpoint: {{ .Values.rdsEndpoint }}
+  rdsDatabaseName: {{ .Values.rdsDatabaseName }}
+  redisAddr: "{{ .Values.redisEndpoint }}:6379"
+  ssmJwtSecretPath: "/{{ .Values.project }}/{{ .Environment.Name }}/JWT_SECRET"

@@ -1,0 +1,25 @@
+# Environment names deliberately match the Terraform workspace names
+# (dev/staging/prod) - `helmfile -e dev` pairs with
+# `terraform workspace select dev`.
+#
+# Each environment layers: common.yaml (shared across all three) ->
+# <env>.yaml (static, checked-in, per-environment config) ->
+# <env>.generated.yaml (apply-time values - IAM role ARNs, cluster name -
+# produced by scripts/generate-terraform-values.sh, gitignored). Run that
+# script before any helmfile command, or the third file won't exist yet.
+environments:
+  dev:
+    values:
+      - common.yaml
+      - dev.yaml
+      - dev.generated.yaml
+  staging:
+    values:
+      - common.yaml
+      - staging.yaml
+      - staging.generated.yaml
+  prod:
+    values:
+      - common.yaml
+      - prod.yaml
+      - prod.generated.yaml

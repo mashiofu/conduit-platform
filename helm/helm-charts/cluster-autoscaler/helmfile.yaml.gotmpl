@@ -1,0 +1,15 @@
+bases:
+  - repositories.yaml.gotmpl
+
+releases:
+  - name: cluster-autoscaler
+    namespace: kube-system
+    chart: autoscaler/cluster-autoscaler
+    # Checked via `helm search repo autoscaler/cluster-autoscaler` on
+    # 2026-08-26 (app v1.35.0). Track this against the EKS Kubernetes
+    # version in terraform/live's env_config - cluster-autoscaler's own
+    # compatibility policy supports the cluster's minor version +/- a
+    # couple, not arbitrary skew.
+    version: 9.59.0
+    values:
+      - values.yaml.gotmpl

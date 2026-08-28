@@ -1,0 +1,133 @@
+name: Deploy Backend
+
+# Received from the backend repo's cd.yml (see
+# golang-gin-realworld-example-app/.github/workflows/cd.yml) after it has
+# already built, tested, and pushed an image - this workflow never builds
+# anything, it only deploys an image that already exists.
+#
+# client_payload: { environment: "dev"|"staging"|"prod", image_tag: "<git sha>" }
+
+on:
+  repository_dispatch:
+    types: [backend-deploy]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # The actual approval gate for prod - see terraform/live/main.tf's
+    # env_config.prod.github_environment, which is the AWS-side half of
+    # this same GitHub Environment concept.
+    environment: ${{ github.event.client_payload.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.3"
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Install helm/helmfile
+        run: |
+          curl -fsSL -o helm.tar.gz https://get.helm.sh/helm-v3.16.2-linux-amd64.tar.gz
+          tar -xzf helm.tar.gz linux-amd64/helm
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o helmfile.tar.gz https://github.com/helmfile/helmfile/releases/download/v1.7.4/helmfile_1.7.4_linux_amd64.tar.gz
+          tar -xzf helmfile.tar.gz helmfile
+          sudo mv helmfile /usr/local/bin/helmfile
+
+      # Broad (AdministratorAccess) on purpose - reusing terraform-ci
+      # rather than adding a fourth role, and this step is read-only
+      # regardless of what the role can do. See modules/iam-github-actions-role's
+      # admin_access variable for the documented trade-off.
+      - name: Configure AWS credentials (terraform-ci, to read Terraform state)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TERRAFORM_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: terraform init
+        working-directory: terraform/live
+        run: terraform init -input=false
+
+      - name: Bridge Terraform outputs into Helmfile values
+        working-directory: helm
+        run: ./scripts/generate-terraform-values.sh ${{ github.event.client_payload.environment }}
+
+      - name: Get cluster name
+        id: cluster
+        working-directory: terraform/live
+        run: |
+          terraform workspace select ${{ github.event.client_payload.environment }}
+          echo "name=$(terraform output -raw eks_cluster_name)" >> "$GITHUB_OUTPUT"
+
+      # Swap to platform-ci for everything that actually touches the
+      # cluster - narrowly scoped to EKS access only (see
+      # modules/eks/main.tf's platform_ci access entry), unlike the role
+      # above.
+      - name: Configure AWS credentials (platform-ci, for cluster access)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.PLATFORM_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ steps.cluster.outputs.name }} --region ${{ vars.AWS_REGION }}
+
+      - name: helmfile apply
+        working-directory: helm
+        run: |
+          helmfile -e ${{ github.event.client_payload.environment }} apply \
+            --state-values-set imageTag=${{ github.event.client_payload.image_tag }}
+
+      - name: Discover the backend's ALB hostname
+        # The ALB is created by the AWS Load Balancer Controller reacting
+        # to the Ingress (see backend-chart/templates/ingress.yaml) -
+        # entirely inside the cluster/AWS runtime, never a Terraform
+        # resource, so this is the one place that value can come from.
+        # Can take a minute-plus after apply for the controller to
+        # provision the ALB and populate this field.
+        id: alb
+        run: |
+          for i in $(seq 1 20); do
+            HOSTNAME=$(kubectl get ingress conduit-backend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            if [ -n "$HOSTNAME" ]; then
+              break
+            fi
+            echo "waiting for the ALB hostname to be assigned... ($i/20)"
+            sleep 15
+          done
+          echo "hostname=$HOSTNAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publish it for the frontend to read
+        if: steps.alb.outputs.hostname != ''
+        working-directory: terraform/live
+        run: |
+          aws ssm put-parameter \
+            --name "$(terraform output -raw backend_url_parameter_name)" \
+            --type String \
+            --overwrite \
+            --value "http://${{ steps.alb.outputs.hostname }}/api"
+
+      - name: Install k6
+        if: steps.alb.outputs.hostname != ''
+        run: |
+          curl -fsSL -o k6.tar.gz https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz
+          tar -xzf k6.tar.gz --strip-components=1 k6-v0.55.0-linux-amd64/k6
+          sudo mv k6 /usr/local/bin/k6
+
+      - name: Smoke test + performance baseline probe
+        if: steps.alb.outputs.hostname != ''
+        working-directory: scripts/k6
+        env:
+          BASE_URL: http://${{ steps.alb.outputs.hostname }}/api
+        run: k6 run --quiet smoke-and-perf.js
+
+      - name: Check for a performance regression
+        if: steps.alb.outputs.hostname != ''
+        working-directory: scripts/k6
+        run: ./compare-baseline.sh ${{ github.event.client_payload.environment }} summary.json

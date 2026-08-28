@@ -1,0 +1,12 @@
+installCRDs: true
+
+serviceAccount:
+  create: true
+  name: external-secrets
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.externalSecretsRoleArn }}
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi

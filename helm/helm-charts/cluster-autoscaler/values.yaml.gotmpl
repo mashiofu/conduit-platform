@@ -1,0 +1,16 @@
+autoDiscovery:
+  clusterName: {{ .Values.clusterName }}
+
+awsRegion: {{ .Values.awsRegion }}
+
+rbac:
+  serviceAccount:
+    create: true
+    name: cluster-autoscaler
+    annotations:
+      eks.amazonaws.com/role-arn: {{ .Values.clusterAutoscalerRoleArn }}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi

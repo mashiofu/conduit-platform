@@ -1,0 +1,14 @@
+# Copy to backend.hcl (gitignored - it's account/environment-specific,
+# not secret) once terraform/bootstrap has been applied, then uncomment
+# the backend "s3" block in versions.tf and run:
+#   terraform init -backend-config=backend.hcl -migrate-state
+#
+# One backend serves all three workspaces (dev/staging/prod) - Terraform
+# namespaces state per workspace automatically under this same key
+# (env:/<workspace>/<key>), so there's nothing workspace-specific to add
+# here.
+
+bucket       = "<state_bucket_name output from ../bootstrap>"
+key          = "live/terraform.tfstate"
+region       = "us-east-1"
+use_lockfile = true

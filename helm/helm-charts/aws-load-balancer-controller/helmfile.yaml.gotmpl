@@ -1,0 +1,11 @@
+bases:
+  - repositories.yaml.gotmpl
+
+releases:
+  - name: aws-load-balancer-controller
+    namespace: kube-system
+    chart: eks/aws-load-balancer-controller
+    # Checked via `helm search repo eks-charts/aws-load-balancer-controller` on 2026-08-26.
+    version: 3.5.0
+    values:
+      - values.yaml.gotmpl

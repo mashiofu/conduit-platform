@@ -1,0 +1,6 @@
+apiVersion: v2
+name: conduit-backend
+description: Helm chart for the Conduit (RealWorld) Go/Gin backend API
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

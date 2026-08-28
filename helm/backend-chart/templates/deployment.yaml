@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "conduit-backend.fullname" . }}
+  labels:
+    {{- include "conduit-backend.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "conduit-backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "conduit-backend.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "conduit-backend.serviceAccountName" . }}
+      containers:
+        - name: conduit-backend
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            - name: GIN_MODE
+              value: release
+            - name: REDIS_ADDR
+              value: {{ .Values.aws.redisAddr | quote }}
+          envFrom:
+            # DATABASE_URL and JWT_SECRET, synced by External Secrets
+            # Operator - see externalsecret.yaml. Never set directly here.
+            - secretRef:
+                name: backend-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/ping/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/ping/
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

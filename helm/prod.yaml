@@ -1,0 +1,11 @@
+# Static, checked-in config for prod. See dev.yaml for the pattern.
+awsRegion: us-east-1
+
+monitoring:
+  prometheusRetention: 30d
+  prometheusRequestsCpu: 500m
+  prometheusRequestsMemory: 1Gi
+
+backend:
+  minReplicas: 3
+  maxReplicas: 10

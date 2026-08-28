@@ -1,0 +1,13 @@
+# Shape of the file scripts/generate-terraform-values.sh produces as
+# dev.generated.yaml (gitignored - this .example is what's actually
+# committed, purely for reference). One of these exists per environment.
+clusterName: conduit-dev-cluster
+vpcId: vpc-xxxxxxxxxxxxxxxxx
+lbControllerRoleArn: arn:aws:iam::123456789012:role/conduit-dev-lb-controller
+externalSecretsRoleArn: arn:aws:iam::123456789012:role/conduit-dev-external-secrets
+clusterAutoscalerRoleArn: arn:aws:iam::123456789012:role/conduit-dev-cluster-autoscaler
+ecrBackendRepositoryUrl: 123456789012.dkr.ecr.us-east-1.amazonaws.com/conduit-dev-backend
+rdsSecretArn: arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+rdsEndpoint: conduit-dev-postgres.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com:5432
+rdsDatabaseName: conduit
+redisEndpoint: conduit-dev-redis.xxxxxx.0001.use1.cache.amazonaws.com

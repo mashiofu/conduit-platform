@@ -1,0 +1,81 @@
+{{- if .Values.grafanaDashboard.enabled }}
+# Auto-discovered by kube-prometheus-stack's Grafana sidecar via this
+# label - no manual import needed. One dashboard, three rows (HTTP / Go
+# runtime / cache) rather than three separate dashboards: cluster/node
+# health already has its own default dashboards from the chart, so this
+# one sticks to what's specific to this app.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "conduit-backend.fullname" . }}-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  conduit-backend.json: |
+    {
+      "title": "Conduit Backend",
+      "uid": "conduit-backend",
+      "timezone": "utc",
+      "schemaVersion": 39,
+      "time": { "from": "now-6h", "to": "now" },
+      "refresh": "30s",
+      "panels": [
+        { "id": 1, "type": "row", "title": "HTTP", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+        {
+          "id": 2, "type": "timeseries", "title": "Request rate by status",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+          "targets": [{ "expr": "sum(rate(http_requests_total{route!=\"unmatched\"}[5m])) by (status)", "legendFormat": "{{`{{status}}`}}" }]
+        },
+        {
+          "id": 3, "type": "stat", "title": "5xx error rate",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
+          "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "steps": [
+            { "color": "green", "value": null }, { "color": "yellow", "value": 0.02 }, { "color": "red", "value": 0.05 }
+          ] } } },
+          "targets": [{ "expr": "sum(rate(http_requests_total{route!=\"unmatched\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{route!=\"unmatched\"}[5m]))" }]
+        },
+        {
+          "id": 4, "type": "timeseries", "title": "Latency percentiles (p50/p95/p99)",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+            { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" },
+            { "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+          ]
+        },
+
+        { "id": 10, "type": "row", "title": "Go runtime", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 } },
+        {
+          "id": 11, "type": "timeseries", "title": "Goroutines",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 10 },
+          "targets": [{ "expr": "go_goroutines{job=~\".*conduit-backend.*\"}" }]
+        },
+        {
+          "id": 12, "type": "timeseries", "title": "Heap in use",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 10 },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [{ "expr": "go_memstats_heap_inuse_bytes{job=~\".*conduit-backend.*\"}" }]
+        },
+        {
+          "id": 13, "type": "timeseries", "title": "GC pause time",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 10 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [{ "expr": "rate(go_gc_duration_seconds_sum{job=~\".*conduit-backend.*\"}[5m])" }]
+        },
+
+        { "id": 20, "type": "row", "title": "Cache", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 } },
+        {
+          "id": 21, "type": "stat", "title": "Hit rate",
+          "gridPos": { "h": 7, "w": 6, "x": 0, "y": 18 },
+          "fieldConfig": { "defaults": { "unit": "percentunit" } },
+          "targets": [{ "expr": "sum(rate(cache_requests_total{result=\"hit\"}[5m])) / sum(rate(cache_requests_total{result=~\"hit|miss\"}[5m]))" }]
+        },
+        {
+          "id": 22, "type": "timeseries", "title": "Requests by outcome",
+          "gridPos": { "h": 7, "w": 18, "x": 6, "y": 18 },
+          "targets": [{ "expr": "sum(rate(cache_requests_total[5m])) by (result)", "legendFormat": "{{`{{result}}`}}" }]
+        }
+      ]
+    }
+{{- end }}

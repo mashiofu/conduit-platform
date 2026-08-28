@@ -1,0 +1,10 @@
+# Values shared by every environment. Kept deliberately small - most
+# real config here is either static-and-per-environment (<env>.yaml) or
+# apply-time-and-per-environment (<env>.generated.yaml from Terraform).
+project: conduit
+
+# Overridden per-deploy via `helmfile --state-values-set imageTag=<git-sha>`
+# (Phase 5's CI/CD) - present here with an empty default purely so the key
+# always exists (Go templates error on a genuinely absent map key, not
+# just an empty one).
+imageTag: ""

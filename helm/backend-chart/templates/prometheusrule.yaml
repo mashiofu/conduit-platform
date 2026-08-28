@@ -1,0 +1,71 @@
+{{- if .Values.alerts.enabled }}
+# Deliberately small. kube-prometheus-stack already ships its own
+# cluster/node-health rules by default (disk/memory pressure, API server
+# health, etc.) - duplicating those here would just be noise. Everything
+# below is specifically about this app, which nothing else is watching.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "conduit-backend.fullname" . }}
+  labels:
+    {{- include "conduit-backend.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: conduit-backend
+      rules:
+        - alert: BackendHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{route!="unmatched", status=~"5.."}[5m]))
+              /
+            sum(rate(http_requests_total{route!="unmatched"}[5m])) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend 5xx rate above 5% for 10m"
+            description: "{{`{{ $value | humanizePercentage }}`}} of requests are failing with a 5xx over the last 5m."
+
+        - alert: BackendHighLatencyP95
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[10m])) by (le)) > 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend p95 latency above 1s for 10m"
+            description: "p95 request latency has been {{`{{ $value | humanizeDuration }}`}} over the last 10m."
+
+        - alert: BackendPodCrashLooping
+          expr: |
+            increase(kube_pod_container_status_restarts_total{pod=~"conduit-backend-.*"}[15m]) > 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Backend pod restarting repeatedly"
+            description: "{{`{{ $labels.pod }}`}} has restarted more than twice in the last 15m - check `kubectl logs --previous`."
+
+        - alert: BackendHPAAtMaxReplicas
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler="conduit-backend"}
+              >=
+            kube_horizontalpodautoscaler_spec_max_replicas{horizontalpodautoscaler="conduit-backend"}
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend HPA has been maxed out for 15m"
+            description: "The backend is running at its HPA ceiling ({{`{{ $value }}`}} replicas) - raise autoscaling.maxReplicas or investigate the load."
+
+        - alert: BackendCacheHitRateLow
+          expr: |
+            sum(rate(cache_requests_total{result="hit"}[30m]))
+              /
+            sum(rate(cache_requests_total{result=~"hit|miss"}[30m])) < 0.2
+          for: 30m
+          labels:
+            severity: info
+          annotations:
+            summary: "Backend cache hit rate below 20% for 30m"
+            description: "Informational, not urgent: anonymous read caching is doing less work than expected - possibly low anonymous traffic, or TTLs too short."
+{{- end }}

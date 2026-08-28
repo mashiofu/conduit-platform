@@ -1,0 +1,27 @@
+{{- if .Values.ingress.enabled }}
+# No custom domain/ACM cert wired up for this project (see
+# docs/design-decisions.md) - this provisions a plain internet-facing ALB
+# on its default *.elb.amazonaws.com hostname over HTTP. A real deployment
+# would add a Route53 record + ACM cert here and switch to HTTPS.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "conduit-backend.fullname" . }}
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /api/ping/
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "conduit-backend.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

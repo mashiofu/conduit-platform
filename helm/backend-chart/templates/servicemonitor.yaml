@@ -1,0 +1,21 @@
+{{- if .Values.serviceMonitor.enabled }}
+# Discovered by kube-prometheus-stack's Prometheus regardless of labels -
+# see helm-charts/monitoring/values.yaml.gotmpl's
+# serviceMonitorSelectorNilUsesHelmValues: false. A larger cluster with
+# multiple teams publishing their own ServiceMonitors would want the
+# label-scoped default instead.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "conduit-backend.fullname" . }}
+  labels:
+    {{- include "conduit-backend.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "conduit-backend.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- end }}

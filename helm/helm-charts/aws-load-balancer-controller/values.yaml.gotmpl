@@ -1,0 +1,14 @@
+clusterName: {{ .Values.clusterName }}
+region: {{ .Values.awsRegion }}
+vpcId: {{ .Values.vpcId }}
+
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.lbControllerRoleArn }}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi

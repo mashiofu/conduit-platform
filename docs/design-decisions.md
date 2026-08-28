@@ -1,0 +1,70 @@
+# Design Decisions & Trade-offs
+
+Every one of these is referenced from a code comment near where it actually matters - this page exists so they're readable together, not scattered. Organized in three parts: deliberate architectural trade-offs, real bugs this project found and fixed (mostly in the forked apps, a few in this platform's own code), and what's knowingly left undone.
+
+## Architecture trade-offs
+
+**Deploy lifecycle: code first, apply later.** Everything in this repo is validated with `terraform plan`, `helmfile lint`/`template`, and real Docker/Redis/Postgres smoke tests wherever possible - deliberately without ever running `terraform apply` against real AWS. That was an explicit call, independent of whether the code is correct: standing up real infrastructure is real spend, and the decision to spend it was kept separate from the decision to write correct code.
+
+**Terraform workspaces, not directory-per-environment.** `terraform/live` is one root module, differentiated by workspace (`dev`/`staging`/`prod`), not three separate directories. HashiCorp's own guidance leans toward directories for strict environment separation - workspaces share code, so there's no filesystem-level guardrail against planning the wrong one. Chosen anyway (a genuinely close call) because: every prod-vs-dev difference lives in one `env_config` map, not scattered conditionals; a resource `precondition` hard-blocks the `default` workspace entirely (a `check` block was tried first and turned out to be advisory-only - see the bug list below); and prod's GitHub Actions role trusts only GitHub's own `prod` Environment, not just "any push."
+
+**Terraform and Helm/Helmfile stay fully separate tools.** Terraform never runs `helm_release`; Helmfile never touches AWS resources. Blast radius stays independent - a VPC change can't accidentally touch Helm-managed workloads and vice versa - at the cost of a bridge script (`helm/scripts/generate-terraform-values.sh`) to carry values (IAM role ARNs, cluster name) from one tool to the other instead of one `terraform apply` handling everything.
+
+**Push-based CD, not GitOps.** GitHub Actions runs `helmfile apply` directly against the cluster (via a dedicated, narrowly-scoped `platform-ci` role) rather than a GitOps controller reconciling from Git. Fewer moving parts, easier to explain end to end; the natural next iteration if this grew would be ArgoCD watching a manifests repo instead.
+
+**Single NAT gateway in dev/staging, one per AZ in prod.** Cuts NAT cost roughly in proportion to AZ count, at the cost of that gateway's AZ being a single point of failure for egress in the cheaper environments. A production environment (this repo's `prod` workspace) gets the fully redundant version.
+
+**RDS Multi-AZ only in prod.** Same shape of trade-off - automatic failover costs roughly double the instance cost, so it's reserved for the environment where an outage actually matters enough to pay for it.
+
+**Redis: single node, no backup.** It's a read-through cache for anonymous GET responses (see the backend's `cache` package) - never a source of truth. Losing it costs some latency until it re-warms, not data, so neither a multi-node replication group nor a backup/restore story is worth its cost here. See `docs/runbooks/backup-restore.md` for the full backup posture across every tier.
+
+**Two different secrets mechanisms, on purpose.** The RDS master credential uses AWS's native "managed master password" (auto-rotated in Secrets Manager, this project never sees the value). The app's own secrets (`JWT_SECRET`) use SSM Parameter Store instead - free, and it directly mirrors real production experience with that specific service. Both get synced into the cluster the same way, via two `ClusterSecretStore`s (External Secrets Operator's AWS provider is single-service per store, so one mechanism can't serve both).
+
+**`terraform-ci`'s GitHub Actions role has `AdministratorAccess`.** Not hidden, not an oversight: Terraform manages IAM itself (including this very role), which rules out AWS's built-in `PowerUserAccess`, and hand-crafting a least-privilege policy across the 9+ services every module here touches wasn't a good time trade-off for this project. The actual gate is that only `conduit-platform`'s own repo can assume the role at all, behind required PR review plus a GitHub Environment approval on the `apply` job - not IAM-level scoping. A more mature setup would split "plan" (read-only) from "apply" and narrow this by service.
+
+**Ansible: not used at all.** EKS managed node groups + Helm already cover every configuration-management need this project has. Adding Ansible on top would be ceremony without a job to do - a deliberate omission, not a gap.
+
+**No custom domain, no ACM certificate, no HTTPS on the backend's ALB.** This project has no registered domain to attach a Route53 record and ACM cert to, so the ALB serves plain HTTP on its default `*.elb.amazonaws.com` hostname. A real deployment would add both before going anywhere near production traffic.
+
+**The backend's public URL is bridged through SSM at runtime, not a Terraform output.** The ALB is created by the AWS Load Balancer Controller reacting to a Kubernetes `Ingress` - entirely inside the cluster/AWS runtime, invisible to Terraform's state. `conduit-platform`'s deploy workflow discovers the hostname via `kubectl` after each apply and writes it to SSM; the frontend's build reads it from there.
+
+**Cross-environment promotion permissions are constructed ARNs, not cross-state references.** Staging/prod's CI roles need read access to dev's ECR repo/S3 bucket to promote an already-built artifact - but dev is a separate Terraform workspace with its own state, unreachable from staging/prod's own run without a cross-state data source this project doesn't set up. Since every environment follows the same deterministic naming, staging/prod just compute "what dev's ARN would be" as a string instead.
+
+**Cache invalidation is TTL-only.** Anonymous readers may see up to the cache TTL (30s for personalized-but-cacheable endpoints, 5m for `/tags`) of staleness after a write; authenticated readers always bypass the cache and see fresh data. Building precise per-key invalidation on every article/comment/favorite mutation was judged not worth the complexity for what this buys.
+
+**The backend's `NetworkPolicy` leaves ingress open on the app port, unscoped by source.** The ALB (target-type `ip`) sends traffic directly to pod IPs from ENIs outside the pod network, so there's no `podSelector`/`ipBlock` that actually means "traffic from the ALB, and only the ALB." Egress is the real boundary in that policy - DNS, Postgres, Redis, nothing else.
+
+## Real bugs found and fixed
+
+Everything below was caught by actually running something - a build, a test, a `terraform plan`, a `helmfile template` - not by inspection. Consolidated here because the pattern itself is a finding: adapting a demo app (or writing new infra) surfaces real, specific gaps regardless of how careful the initial pass is; the point is catching them before they ship, not never introducing them.
+
+**In the forked backend:**
+- SQLite was the only supported database - added a Postgres path (env-driven via `DATABASE_URL`), verified against a real Postgres container before ever wiring up RDS.
+- The JWT signing secret was a hardcoded source constant - made it read from `JWT_SECRET`, falling back to the original value only for zero-config local dev.
+- The container crashed outright as a non-root user - `/app` was root-owned, so the SQLite fallback couldn't create its data directory. Never caught earlier because every prior smoke test used `DATABASE_URL` instead.
+
+**In the forked frontend:**
+- The API base URL was hardcoded to the public `api.realworld.show` demo backend - made it runtime-configurable via a small `env.js` loaded before the Angular bundle, so one built artifact can point at any environment without a rebuild.
+- `zone.js` was imported by the test suite but was only an *optional* peer dependency of `@angular/core` (the app runs zoneless in production) - a clean install could never actually run the tests. Added it as a real devDependency.
+- Six spec files each redundantly re-initialized Angular's `TestBed` on top of the global test-setup file, which only surfaced as a real failure once the `zone.js` fix above let the tests get far enough to hit it.
+
+**In this platform's own code:**
+- A circular Terraform module dependency (the `eks` module wanted RDS's secret ARN; RDS wanted `eks`'s security group ID) - resolved by having the IAM policy scope by RDS's own secret-naming convention instead of the exact ARN.
+- `for_each` over a list built from an apply-time-unknown value (the cluster security group ID) - Terraform correctly rejects this since the key set becomes unknown; fixed the standard way, switching to a map with a static key.
+- A `check` block was the first attempt at hard-blocking the `default` Terraform workspace - only to discover `check` assertion failures are advisory warnings in Terraform, not real failures. Replaced with a resource `precondition`, which does hard-fail, wired via explicit `depends_on` into every module.
+- Three separate `{{ }}` escaping bugs, all the same root cause: Helm and another tool (External Secrets Operator, Prometheus Alertmanager, Grafana) both use Go template `{{ }}` syntax, and Helm happily "resolves" the other tool's placeholders unless they're deliberately escaped. Caught each time by actually running `helmfile template` and reading the parse error, not by inspection.
+- A naming mismatch (the GitHub Environment was `"production"`, the Terraform workspace is `"prod"`) - same concept, two names, fixed before it propagated into every CI workflow.
+- Promotion workflows would have failed silently: staging/prod's CI roles only had permissions on their *own* ECR repo/S3 bucket, not dev's, and promotion needs to read dev's.
+- The forked frontend repo shipped its own `deploy.yml`, firing on every push to `main` and creating a GitHub Release - directly conflicting with this project's own `cd.yml` on the identical trigger. Removed.
+
+## Deliberately not done (next steps, not oversights)
+
+- OCI Helm chart registry publishing (charts currently referenced by local path/upstream repo, not versioned artifacts in ECR)
+- A spot-instance mix for EKS nodes (cost optimization, not attempted here)
+- Kyverno/OPA policy enforcement in-cluster
+- AWS WAF in front of CloudFront/the ALB
+- A custom domain, ACM certificate, and HTTPS for the backend
+- Actually executing the backup/restore runbook against live infrastructure (written, not drilled)
+- A live pod/node-kill self-healing demonstration
+- Automatic ratcheting of the k6 performance baseline (currently a deliberate, human-reviewed commit - see `scripts/k6/compare-baseline.sh`)
+- A GitHub App (installation tokens) instead of a long-lived fine-grained PAT for cross-repo `repository_dispatch`

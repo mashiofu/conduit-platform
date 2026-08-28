@@ -1,0 +1,16 @@
+bases:
+  - repositories.yaml.gotmpl
+
+releases:
+  - name: kube-prometheus-stack
+    namespace: monitoring
+    createNamespace: true
+    chart: prometheus-community/kube-prometheus-stack
+    # Checked via `helm search repo prometheus-community/kube-prometheus-stack`
+    # on 2026-08-26 (Prometheus Operator v0.93.1). This just gets the
+    # stack installed with sane per-environment sizing - real dashboards
+    # and alert rules are a later phase (docs/design-decisions.md), not
+    # scope creep here.
+    version: 88.5.4
+    values:
+      - values.yaml.gotmpl

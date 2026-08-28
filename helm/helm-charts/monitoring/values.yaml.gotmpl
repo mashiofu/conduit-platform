@@ -1,0 +1,20 @@
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true
+
+prometheus:
+  prometheusSpec:
+    retention: {{ .Values.monitoring.prometheusRetention }}
+    resources:
+      requests:
+        cpu: {{ .Values.monitoring.prometheusRequestsCpu }}
+        memory: {{ .Values.monitoring.prometheusRequestsMemory }}
+    # Discover ServiceMonitors/PrometheusRules cluster-wide instead of
+    # only ones labeled for this chart's own release - simpler for a
+    # single-team cluster like this one. A larger, multi-tenant cluster
+    # would flip these back to the (safer, more restrictive) default.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+alertmanager:
+  enabled: true

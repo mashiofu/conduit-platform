@@ -1,0 +1,13 @@
+# Static, checked-in config for dev - anything known ahead of an apply.
+# Apply-time values (cluster name, IAM role ARNs, ...) come from
+# dev.generated.yaml instead - see environments.yaml.
+awsRegion: us-east-1
+
+monitoring:
+  prometheusRetention: 7d
+  prometheusRequestsCpu: 250m
+  prometheusRequestsMemory: 512Mi
+
+backend:
+  minReplicas: 2
+  maxReplicas: 4

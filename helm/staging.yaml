@@ -1,0 +1,11 @@
+# Static, checked-in config for staging. See dev.yaml for the pattern.
+awsRegion: us-east-1
+
+monitoring:
+  prometheusRetention: 14d
+  prometheusRequestsCpu: 250m
+  prometheusRequestsMemory: 512Mi
+
+backend:
+  minReplicas: 2
+  maxReplicas: 4

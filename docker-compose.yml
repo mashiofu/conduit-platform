@@ -1,0 +1,75 @@
+# Local dev/verification stack for the Conduit (RealWorld) platform.
+#
+# Assumes the three repos are checked out as siblings, matching the layout
+# this whole project uses:
+#   incode-take-home-task/
+#     conduit-platform/                    (this file)
+#     golang-gin-realworld-example-app/
+#     angular-realworld-example-app/
+#
+# Usage: docker compose up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: conduit
+      POSTGRES_USER: conduit
+      POSTGRES_PASSWORD: conduit_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conduit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../golang-gin-realworld-example-app
+    environment:
+      PORT: "8080"
+      GIN_MODE: release
+      DATABASE_URL: "postgres://conduit:conduit_dev_password@postgres:5432/conduit?sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      JWT_SECRET: "local-dev-secret-do-not-use-in-real-envs"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8080/api/ping/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build:
+      context: ../angular-realworld-example-app
+    environment:
+      # Browser-side requests hit the backend via the *host* mapping, not
+      # the compose network - hence localhost:8080, not backend:8080.
+      API_URL: "http://localhost:8080/api"
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

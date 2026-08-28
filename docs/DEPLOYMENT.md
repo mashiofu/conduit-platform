@@ -157,31 +157,39 @@ kubectl get pods -A
 ```
 Expect pods in `kube-system` (LB controller, cluster-autoscaler), `external-secrets`, and `monitoring` (Prometheus/Grafana/Alertmanager), all `Running`.
 
-## 7. Push any changes of your own
+## 7. Push your code to GitHub
 
-If you cloned all three repos fresh per the Prerequisites section, this is a no-op - everything the deploy needs is already committed and pushed. This step only matters if you've since made your *own* edits (e.g. adjusting `env_config` in `terraform/live/main.tf`, or anything else):
+Which of these applies depends on where you're starting from:
 
-```bash
-cd ../../conduit-platform   # back to its root - step 6 left you inside conduit-platform/helm
-git add -A && git status   # review what's actually changed, then:
-git commit -m "..."
-git push origin main
+> **Repos not pushed yet** (working from local changes for the first time): commit and push all three now.
+> ```bash
+> cd ../../conduit-platform   # back to its root - step 6 left you inside conduit-platform/helm
+> git add -A && git status   # review what's actually changed, then:
+> git commit -m "..."
+> git push origin main
+>
+> cd ../golang-gin-realworld-example-app && git add -A && git status && git commit -m "..." && git push origin main
+> cd ../angular-realworld-example-app && git add -A && git status && git commit -m "..." && git push origin main
+> ```
 
-# repeat for the other two repos if you touched them too
-cd ../golang-gin-realworld-example-app && git add -A && git status
-cd ../angular-realworld-example-app && git add -A && git status
-```
+> **Repos already on GitHub** (you cloned them fresh per the Prerequisites section, or already pushed in an earlier pass): nothing to do here - skip to step 8. If you've made your *own* edits since then (e.g. adjusting `env_config` in `terraform/live/main.tf`), treat just those like the case above.
 
 ## 8. Let the real pipeline deploy the backend, then the frontend
 
-`cd.yml` on a push to `main` is what does the actual deploy: build → test → push to ECR → `repository_dispatch` → `conduit-platform`'s `deploy-backend.yml` runs `helmfile apply` for the backend, waits for the ALB, runs the k6 smoke+perf check, and publishes the ALB hostname to SSM. If `main` hasn't moved since before step 4 (the `dev` GitHub Environment didn't exist yet, so any earlier run of this failed fast), trigger it explicitly rather than waiting for a push that isn't coming:
+`cd.yml` on a push to `main` is what does the actual deploy: build → test → push to ECR → `repository_dispatch` → `conduit-platform`'s `deploy-backend.yml` runs `helmfile apply` for the backend, waits for the ALB, runs the k6 smoke+perf check, and publishes the ALB hostname to SSM. Same two cases as step 7 apply to how it gets started:
 
-```bash
-gh workflow run cd.yml --repo "$GITHUB_ORG/$BACKEND_REPO"
-gh run watch --repo "$GITHUB_ORG/$BACKEND_REPO"
-```
+> **Step 7 just pushed for the first time**: that push already triggered it (steps 1-6 had already set up everything it needs to authenticate, so it should succeed). Just watch it:
+> ```bash
+> gh run watch --repo "$GITHUB_ORG/$BACKEND_REPO"
+> ```
 
-Once that finishes, do the same for the frontend so it picks up the now-published backend URL:
+> **Your code was already on GitHub before you started this guide** (step 7 was a no-op): `cd.yml` already ran once, back when it was first pushed - before the `dev` GitHub Environment existed, so that run failed within seconds and won't retry on its own. Trigger it explicitly instead:
+> ```bash
+> gh workflow run cd.yml --repo "$GITHUB_ORG/$BACKEND_REPO"
+> gh run watch --repo "$GITHUB_ORG/$BACKEND_REPO"
+> ```
+
+Either way, once the backend's run finishes, explicitly (re-)trigger the frontend so it picks up the now-published backend URL - even if its own push already fired automatically, that would have raced ahead of the backend publishing anything to SSM:
 ```bash
 gh workflow run cd.yml --repo "$GITHUB_ORG/$FRONTEND_REPO"
 gh run watch --repo "$GITHUB_ORG/$FRONTEND_REPO"

@@ -92,7 +92,7 @@ region       = "us-east-1"
 use_lockfile = true
 ```
 
-Uncomment the `backend "s3" { ... }` block in `versions.tf` (it's the last thing in that file, commented out with instructions right above it).
+Uncomment the `backend "s3" {}` block in `versions.tf` (it's the last thing in that file, commented out with instructions right above it) - leave it **empty**. Every real value comes from `backend.hcl` via `-backend-config` below; `versions.tf` is committed to git, so your bucket name should never end up hardcoded in it.
 
 ```bash
 terraform workspace select dev

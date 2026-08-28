@@ -73,8 +73,10 @@ terraform apply -var="state_bucket_name=<something-globally-unique>"
 ```
 
 Then, in `live/`: copy `backend.hcl.example` to `backend.hcl`, fill in the
-bucket name from that output, uncomment the `backend "s3"` block in
-`versions.tf`, and run `terraform init -backend-config=backend.hcl -migrate-state`.
+bucket name from that output, uncomment the `backend "s3" {}` block in
+`versions.tf` (leave it **empty** - `versions.tf` is committed to git, so
+every real value belongs in `backend.hcl` instead, never hardcoded here),
+and run `terraform init -backend-config=backend.hcl -migrate-state`.
 
 ## Provider version pinning
 

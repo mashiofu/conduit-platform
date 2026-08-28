@@ -6,10 +6,28 @@
 locals {
   # Either "any ref on this repo" or "only this GitHub Environment", per
   # var.github_environment - see its description for when to use which.
+  #
+  # The `@*` after the org and after each repo name accounts for GitHub's
+  # "immutable subject claims" format (shipped 2026-04-23: see
+  # https://github.blog/changelog/2026-04-23-immutable-subject-claims-for-github-actions-oidc-tokens/),
+  # which every repo created after 2026-07-15 uses automatically, with no
+  # opt-out - the sub claim is `repo:OWNER@OWNER-ID/REPO@REPO-ID:...`, not
+  # the classic `repo:OWNER/REPO:...` every existing example/tutorial
+  # (and this pattern, until this fix) assumes. Confirmed live via
+  # CloudTrail: a real `AssumeRoleWithWebIdentity` call's actual
+  # `userIdentity.principalId` showed
+  # `repo:octo-org@123456/octo-repo@456789:environment:dev` (GitHub's own
+  # changelog example format, standing in here for the real org/repo/IDs
+  # actually observed)
+  # - the old pattern's `StringLike` match failed because the literal
+  # text right after `repo:${org}` is `@<owner-id>`, not `/`, so the
+  # match position never lines up. `@` can't appear in a GitHub username
+  # or repo name, so `@*` only ever matches the numeric ID GitHub inserts
+  # there - it doesn't loosen which org/repo name is trusted.
   trust_subjects = var.github_environment != null ? [
-    for repo in var.github_repos : "repo:${var.github_org}/${repo}:environment:${var.github_environment}"
+    for repo in var.github_repos : "repo:${var.github_org}@*/${repo}@*:environment:${var.github_environment}"
     ] : [
-    for repo in var.github_repos : "repo:${var.github_org}/${repo}:*"
+    for repo in var.github_repos : "repo:${var.github_org}@*/${repo}@*:*"
   ]
 }
 

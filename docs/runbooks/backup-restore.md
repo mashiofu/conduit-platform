@@ -52,12 +52,16 @@ aws rds restore-db-instance-from-db-snapshot \
 
 Versioning means a deleted or overwritten object isn't gone - it's a noncurrent version:
 
+The bucket is named `conduit-<env>-frontend-<your GITHUB_ORG>` (see `deploy.env`) - `terraform output frontend_bucket_name` gives you the exact value for the environment you're in:
+
 ```bash
-aws s3api list-object-versions --bucket conduit-<env>-frontend-mashiofu --prefix <path>
+BUCKET="$(terraform -chdir=terraform/live output -raw frontend_bucket_name)"
+
+aws s3api list-object-versions --bucket "$BUCKET" --prefix <path>
 
 aws s3api copy-object \
-  --bucket conduit-<env>-frontend-mashiofu \
-  --copy-source "conduit-<env>-frontend-mashiofu/<path>?versionId=<version-id-from-above>" \
+  --bucket "$BUCKET" \
+  --copy-source "$BUCKET/<path>?versionId=<version-id-from-above>" \
   --key <path>
 ```
 

@@ -1,24 +1,41 @@
 # Deploying From Scratch
 
-Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see `docs/design-decisions.md`: standing up real AWS infrastructure was a deliberate, separate decision from writing the code, and Claude Code's own permission model blocks an agent from running `terraform apply`/`helmfile apply` unattended anyway).
+Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see `docs/design-decisions.md`: standing up real AWS infrastructure was a deliberate, separate decision from writing the code).
 
-Assumes you're in `~/incode-take-home-task/` with all three repos as sibling directories, and the `devops-challenge` AWS profile is configured (`aws sts get-caller-identity --profile devops-challenge` should work).
+Nothing in this guide is specific to any one person - it's written for whoever forked these three repos to their own GitHub account, into their own AWS account. That's step 0.
 
 **Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see `docs/cost-estimate.md` (~$7.50/day for `dev`).
 
 ---
+
+## 0. Configure your deployment
+
+```bash
+cd conduit-platform
+cp deploy.env.example deploy.env
+```
+
+Edit `deploy.env` - fill in your own AWS profile name, GitHub username/org, and a globally-unique Terraform state bucket name (see the comments in the file for what each value means and why it matters). Then, in **every terminal** you use for the rest of this guide:
+
+```bash
+source deploy.env
+```
+
+Every command below assumes this has been done - none of them hardcode an AWS profile, GitHub org, or bucket name. If a command fails because a variable is unset, you skipped this step (or opened a new terminal without re-sourcing it).
+
+Assumes you're in `~/incode-take-home-task/` (or wherever) with all three repos as sibling directories.
 
 ## 1. Bootstrap remote Terraform state
 
 One-time, per AWS account:
 
 ```bash
-cd conduit-platform/terraform/bootstrap
+cd terraform/bootstrap
 terraform init
-AWS_PROFILE=devops-challenge terraform apply -var="state_bucket_name=conduit-terraform-state-mashiofu"
+terraform apply -var="state_bucket_name=$TF_STATE_BUCKET"
 ```
 
-Type `yes` when prompted. If that bucket name is taken (S3 names are global across every AWS account, not just yours), pick a different suffix and use that same name in every step below.
+Type `yes` when prompted. If that bucket name is taken (S3 names are global across every AWS account on Earth, not just yours), pick a different value for `TF_STATE_BUCKET` in `deploy.env`, re-source it, and retry.
 
 ## 2. Point `live/` at the new backend
 
@@ -27,10 +44,10 @@ cd ../live
 cp backend.hcl.example backend.hcl
 ```
 
-Edit `backend.hcl` - replace the placeholder with the real bucket name from step 1:
+Edit `backend.hcl` - replace the placeholder with your real bucket name:
 
 ```hcl
-bucket       = "conduit-terraform-state-mashiofu"
+bucket       = "your-TF_STATE_BUCKET-value-here"
 key          = "live/terraform.tfstate"
 region       = "us-east-1"
 use_lockfile = true
@@ -48,14 +65,14 @@ Answer `yes` to "copy existing state to the new backend." (The `dev`/`staging`/`
 ## 3. Apply Terraform - this is the real infrastructure
 
 ```bash
-AWS_PROFILE=devops-challenge terraform apply
+terraform apply
 ```
 
-Review the plan, type `yes`. This provisions the VPC, EKS cluster + node group, RDS, ElastiCache, ECR, every IAM role, CloudFront/S3, the `JWT_SECRET` SSM parameter, and the CloudWatch saved queries - **~85 resources**. The EKS cluster + node group is what makes this slow (10-15 minutes is normal); everything else is fast.
+Review the plan, type `yes`. This provisions the VPC, EKS cluster + node group, RDS, ElastiCache, ECR, every IAM role (trust-scoped to `$GITHUB_ORG`'s repos - this is where `deploy.env` actually matters, not just cosmetically), CloudFront/S3, the `JWT_SECRET` SSM parameter, and the CloudWatch saved queries - **~85 resources**. The EKS cluster + node group is what makes this slow (10-15 minutes is normal); everything else is fast.
 
 When it finishes, sanity-check the cluster exists:
 ```bash
-aws eks describe-cluster --name conduit-dev-cluster --region us-east-1 --profile devops-challenge --query 'cluster.status'
+aws eks describe-cluster --name conduit-dev-cluster --query 'cluster.status'
 # -> "ACTIVE"
 ```
 
@@ -66,7 +83,7 @@ cd ../../scripts
 ./sync-github-environments.sh dev
 ```
 
-This creates/updates a `dev` GitHub Environment in all three repos with the IAM role ARNs, ECR URL, S3 bucket name, and CloudFront distribution ID that each repo's workflows need. Requires `gh` authenticated (it already is) and `jq`.
+This creates/updates a `dev` GitHub Environment in all three repos (`$PLATFORM_REPO`, `$BACKEND_REPO`, `$FRONTEND_REPO` under `$GITHUB_ORG`) with the IAM role ARNs, ECR URL, S3 bucket name, and CloudFront distribution ID that each repo's workflows need. Requires `gh` authenticated (it already is) and `jq`.
 
 ## 5. Create the cross-repo dispatch token (manual - can't be automated)
 
@@ -74,13 +91,13 @@ The backend/frontend repos need to notify `conduit-platform` when they've built 
 
 1. Go to **github.com/settings/personal-access-tokens/new** (fine-grained token).
 2. Name it something like `conduit-platform-dispatch`, set an expiration.
-3. **Repository access**: only `conduit-platform` - not all repos.
+3. **Repository access**: only `$PLATFORM_REPO` - not all repos.
 4. **Permissions**: Repository permissions → **Contents: Read and write**.
 5. Generate it, copy the value (you won't see it again).
 6. Add it as a secret in *both* app repos:
    ```bash
-   gh secret set PLATFORM_DISPATCH_TOKEN --repo mashiofu/golang-gin-realworld-example-app --body "<paste-token>"
-   gh secret set PLATFORM_DISPATCH_TOKEN --repo mashiofu/angular-realworld-example-app --body "<paste-token>"
+   gh secret set PLATFORM_DISPATCH_TOKEN --repo "$GITHUB_ORG/$BACKEND_REPO" --body "<paste-token>"
+   gh secret set PLATFORM_DISPATCH_TOKEN --repo "$GITHUB_ORG/$FRONTEND_REPO" --body "<paste-token>"
    ```
    (Or add it through each repo's Settings → Secrets and variables → Actions, if you'd rather not paste a token into a terminal command's argument list.)
 
@@ -90,7 +107,7 @@ Everything except the backend itself - that gets its first real deploy in step 8
 
 ```bash
 cd ../helm
-aws eks update-kubeconfig --name conduit-dev-cluster --region us-east-1 --profile devops-challenge
+aws eks update-kubeconfig --name conduit-dev-cluster --region "$AWS_REGION"
 ./scripts/generate-terraform-values.sh dev
 helmfile -e dev -l name!=conduit-backend apply
 ```
@@ -103,7 +120,7 @@ Expect pods in `kube-system` (LB controller, cluster-autoscaler), `external-secr
 
 ## 7. Push all three repos to GitHub
 
-Everything's been sitting uncommitted (per an earlier call - see the chat history), so review before committing:
+Everything's been sitting uncommitted, so review before committing:
 
 ```bash
 cd ../../conduit-platform
@@ -124,14 +141,14 @@ git push origin main
 
 ## 8. Let the real pipeline deploy the backend, then the frontend
 
-Pushing to `golang-gin-realworld-example-app`'s `main` branch (step 7 already did this) triggers `cd.yml` automatically: build → test → push to ECR → `repository_dispatch` → `conduit-platform`'s `deploy-backend.yml` runs `helmfile apply` for the backend, waits for the ALB, runs the k6 smoke+perf check, and publishes the ALB hostname to SSM.
+Pushing to `$BACKEND_REPO`'s `main` branch (step 7 already did this) triggers `cd.yml` automatically: build → test → push to ECR → `repository_dispatch` → `conduit-platform`'s `deploy-backend.yml` runs `helmfile apply` for the backend, waits for the ALB, runs the k6 smoke+perf check, and publishes the ALB hostname to SSM.
 
-**Watch it**: `gh run watch --repo mashiofu/golang-gin-realworld-example-app` (or the Actions tab in the browser).
+**Watch it**: `gh run watch --repo "$GITHUB_ORG/$BACKEND_REPO"` (or the Actions tab in the browser).
 
 Once that finishes, the frontend needs to pick up the now-published backend URL. Its own push in step 7 may have run *before* the backend URL existed - if so, just re-run it:
 ```bash
-gh workflow run cd.yml --repo mashiofu/angular-realworld-example-app
-gh run watch --repo mashiofu/angular-realworld-example-app
+gh workflow run cd.yml --repo "$GITHUB_ORG/$FRONTEND_REPO"
+gh run watch --repo "$GITHUB_ORG/$FRONTEND_REPO"
 ```
 
 ## 9. Verify end to end
@@ -142,7 +159,7 @@ kubectl get ingress conduit-backend
 curl http://<hostname-from-above>/api/ping/
 
 # Frontend - open in a browser
-aws cloudfront list-distributions --profile devops-challenge \
+aws cloudfront list-distributions \
   --query "DistributionList.Items[?Comment=='conduit-dev frontend'].DomainName" --output text
 ```
 Open that CloudFront URL, register a user, create an article, favorite something - that exercises frontend → ALB → backend → RDS and Redis all at once.
@@ -158,5 +175,5 @@ cd conduit-platform/helm
 helmfile -e dev destroy
 
 cd ../terraform/live
-AWS_PROFILE=devops-challenge terraform destroy
+terraform destroy
 ```

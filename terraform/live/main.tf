@@ -203,9 +203,10 @@ module "github_role_terraform_ci" {
   depends_on = [terraform_data.workspace_guard]
 
   # Bootstrapping note: this role doesn't exist yet the first time anyone
-  # applies this config, so that first apply has to run as a human (the
-  # devops-challenge IAM user) - same as everything else in this repo so
-  # far. Once it exists, CI can take over subsequent applies.
+  # applies this config, so that first apply has to run as a human (via
+  # whatever IAM identity's credentials/profile you configured - see
+  # deploy.env.example) - same as everything else in this repo so far.
+  # Once it exists, CI can take over subsequent applies.
   name              = "${local.name_prefix}-terraform-ci"
   oidc_provider_arn = module.github_oidc_provider.arn
   github_org        = var.github_org

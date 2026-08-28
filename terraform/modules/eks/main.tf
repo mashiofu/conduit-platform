@@ -45,9 +45,10 @@ resource "aws_eks_cluster" "this" {
   tags = merge(var.tags, { Name = "${var.name_prefix}-cluster" })
 }
 
-# Grants the identity that runs `terraform apply` (the devops-challenge
-# IAM user, in this account) cluster-admin. Add further access entries
-# here for anyone else who needs kubectl/Helm access.
+# Grants the identity that runs `terraform apply` (whichever IAM
+# user/role is behind your configured AWS credentials - see
+# deploy.env.example) cluster-admin. Add further access entries here for
+# anyone else who needs kubectl/Helm access.
 data "aws_caller_identity" "current" {}
 
 resource "aws_eks_access_entry" "applier" {

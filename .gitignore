@@ -1,0 +1,5 @@
+# Personal deployment config - see deploy.env.example. Never commit your
+# own values (AWS profile name, GitHub org, state bucket name).
+deploy.env
+
+.DS_Store

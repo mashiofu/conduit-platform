@@ -10,13 +10,17 @@
 # would change if that resource were ever replaced).
 #
 # Usage: scripts/sync-github-environments.sh <dev|staging|prod>
+#
+# Reads GITHUB_ORG, PLATFORM_REPO, BACKEND_REPO, FRONTEND_REPO from the
+# environment - `source deploy.env` (see deploy.env.example) before
+# running this, same as every other command in docs/DEPLOYMENT.md.
 set -euo pipefail
 
 ENV="${1:?usage: $0 <dev|staging|prod>}"
-OWNER="mashiofu"
-PLATFORM_REPO="conduit-platform"
-BACKEND_REPO="golang-gin-realworld-example-app"
-FRONTEND_REPO="angular-realworld-example-app"
+OWNER="${GITHUB_ORG:?GITHUB_ORG is not set - source deploy.env first (see deploy.env.example)}"
+PLATFORM_REPO="${PLATFORM_REPO:?PLATFORM_REPO is not set - source deploy.env first}"
+BACKEND_REPO="${BACKEND_REPO:?BACKEND_REPO is not set - source deploy.env first}"
+FRONTEND_REPO="${FRONTEND_REPO:?FRONTEND_REPO is not set - source deploy.env first}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TF_DIR="$SCRIPT_DIR/../terraform/live"

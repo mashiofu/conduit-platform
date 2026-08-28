@@ -3,8 +3,9 @@
 # apply-time-and-per-environment (<env>.generated.yaml from Terraform).
 project: conduit
 
-# Overridden per-deploy via `helmfile --state-values-set imageTag=<git-sha>`
-# (Phase 5's CI/CD) - present here with an empty default purely so the key
-# always exists (Go templates error on a genuinely absent map key, not
-# just an empty one).
-imageTag: ""
+# No imageTag here (there used to be one, meant to be overridden via
+# `helmfile --state-values-set imageTag=<git-sha>`): state values render
+# before CLI overrides merge, so that flag never actually reached
+# values.yaml.gotmpl's template. deploy-backend.yml now passes the tag
+# via `helmfile apply --set image.tag=<git-sha>` instead, applied
+# directly to the chart's own values - see docs/design-decisions.md.

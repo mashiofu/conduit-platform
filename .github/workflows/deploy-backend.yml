@@ -106,9 +106,21 @@ jobs:
 
       - name: helmfile apply
         working-directory: helm
+        # --set, not --state-values-set: state values (helmfile's own
+        # gotmpl templating layer - common.yaml, values.yaml.gotmpl)
+        # render *before* CLI overrides are merged, so --state-values-set
+        # was never actually visible to values.yaml.gotmpl's
+        # `{{ .Values.imageTag }}` check - confirmed both by
+        # `helmfile write-values` showing no `tag:` key at all despite
+        # passing it, and by every backend pod stuck in ImagePullBackOff
+        # on the chart's own bundled default (image.tag: "latest",
+        # never actually pushed to ECR). --set applies directly to the
+        # final Helm chart values, bypassing that layer entirely -
+        # verified via `helmfile template --set image.tag=...` rendering
+        # the correct image reference.
         run: |
           helmfile -e ${{ github.event.client_payload.environment }} apply \
-            --state-values-set imageTag=${{ github.event.client_payload.image_tag }}
+            --set image.tag=${{ github.event.client_payload.image_tag }}
 
       - name: Discover the backend's ALB hostname
         # The ALB is created by the AWS Load Balancer Controller reacting

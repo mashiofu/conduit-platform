@@ -1,8 +1,11 @@
+# image.tag is deliberately not set here - deploy-backend.yml passes it
+# via `helmfile apply --set image.tag=<git-sha>`, not a state value.
+# State values (what .Values sees in this file) render before CLI
+# overrides merge, so `--state-values-set imageTag=...` (the original,
+# broken approach) was never actually visible here - see
+# docs/design-decisions.md for the live incident this came from.
 image:
   repository: {{ .Values.ecrBackendRepositoryUrl }}
-  {{- if .Values.imageTag }}
-  tag: {{ .Values.imageTag }}
-  {{- end }}
 
 replicaCount: {{ .Values.backend.minReplicas }}
 

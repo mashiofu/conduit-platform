@@ -13,5 +13,14 @@ releases:
     # SecretStore validation) needs its pod Ready before the `backend`
     # release later in the list can safely create its ExternalSecret.
     wait: true
+    # timeout: 600 - hit live on 2026-08-28: `wait: true`'s default 300s
+    # narrowly missed the external-secrets-cert-controller Deployment
+    # settling into Ready ("Progress deadline exceeded"), even though
+    # kubectl showed it healthy moments after the command gave up.
+    # Its own reconcile cycle (--crd-requeue-interval=5m, one of its
+    # container args) sits right at that same 300s default with no
+    # margin - giving it more room is cheaper than a flaky-looking
+    # failure on a future fresh deploy.
+    timeout: 600
     values:
       - values.yaml.gotmpl

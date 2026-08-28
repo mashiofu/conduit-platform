@@ -52,7 +52,16 @@ jobs:
 
       - name: terraform init
         working-directory: terraform/live
-        run: terraform init -input=false
+        # bucket is account-specific (synced by scripts/sync-github-environments.sh
+        # from the same backend.hcl a local run uses); key/use_lockfile are
+        # fixed project conventions, not account-specific, so they're
+        # literals here rather than another synced variable.
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=live/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="use_lockfile=true"
 
       - name: Bridge Terraform outputs into Helmfile values
         working-directory: helm

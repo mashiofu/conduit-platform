@@ -24,20 +24,18 @@ terraform {
   #
   #   1. cd ../bootstrap && terraform init && \
   #        terraform apply -var="state_bucket_name=<globally-unique-name>"
-  #   2. uncomment the backend "s3" block below, filling in the bucket
-  #      name from that apply's output
-  #   3. terraform init -migrate-state
+  #   2. uncomment the EMPTY backend "s3" block below - do NOT fill in
+  #      real values here, this file is committed to git. Every actual
+  #      value (bucket/key/region/use_lockfile) comes from backend.hcl
+  #      (gitignored - see backend.hcl.example) via -backend-config
+  #      below, so no account-specific value ever lands in this file.
+  #   3. terraform init -backend-config=backend.hcl -migrate-state
   #
   # With workspaces, a single backend key is automatically namespaced per
   # workspace by Terraform itself (env:/<workspace>/<key>) - no per-
   # environment key to manage by hand.
   #
-  # backend "s3" {
-  #   bucket       = "<state_bucket_name from bootstrap>"
-  #   key          = "live/terraform.tfstate"
-  #   region       = "us-east-1"
-  #   use_lockfile = true
-  # }
+  backend "s3" {}
 }
 
 provider "aws" {

@@ -36,6 +36,17 @@ val() { jq -r ".\"$1\".value" <<<"$OUTPUTS_JSON"; }
 REGION="$(val aws_region)"
 ENV_UPPER="$(echo "$ENV" | tr '[:lower:]' '[:upper:]')"
 
+# The Terraform state bucket isn't a `live` output - it's an INPUT,
+# produced by the separate `terraform/bootstrap` apply, whose own state
+# lives wherever that apply ran (can't live inside the bucket it itself
+# creates). backend.hcl is the practical, already-established local
+# record of that value (see its own comment) - read it from there
+# rather than re-pointing this script at bootstrap's state too.
+BACKEND_HCL="$TF_DIR/backend.hcl"
+[ -f "$BACKEND_HCL" ] || { echo "$BACKEND_HCL not found - copy it from backend.hcl.example and fill in bucket (from terraform/bootstrap's state_bucket_name output) first" >&2; exit 1; }
+STATE_BUCKET="$(grep -E '^[[:space:]]*bucket[[:space:]]*=' "$BACKEND_HCL" | sed -E 's/^[[:space:]]*bucket[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')"
+[ -n "$STATE_BUCKET" ] || { echo "Could not parse a bucket value out of $BACKEND_HCL" >&2; exit 1; }
+
 ensure_environment() {
   gh api -X PUT "repos/$OWNER/$1/environments/$2" >/dev/null
 }
@@ -66,6 +77,13 @@ set_env_var "$PLATFORM_REPO" "$ENV" AWS_REGION "$REGION"
 # comment on why), so it can't read environment-scoped variables.
 set_repo_var "$PLATFORM_REPO" "TERRAFORM_CI_ROLE_ARN_${ENV_UPPER}" "$(val github_actions_terraform_role_arn)"
 set_repo_var "$PLATFORM_REPO" AWS_REGION "$REGION"
+# Same bucket for every workspace (dev/staging/prod) - not environment-
+# specific, so this is a flat repo-level var like the two above, synced
+# every run regardless of which $ENV was passed. terraform.yml and
+# deploy-backend.yml's `terraform init` steps need this to actually
+# reach the real backend instead of silently falling back to an empty
+# local one - see docs/design-decisions.md for that incident.
+set_repo_var "$PLATFORM_REPO" TF_STATE_BUCKET "$STATE_BUCKET"
 
 echo "=== $BACKEND_REPO ($ENV) ==="
 ensure_environment "$BACKEND_REPO" "$ENV"

@@ -161,8 +161,10 @@ Everything except the backend itself - that gets its first real deploy in step 8
 cd ../helm
 aws eks update-kubeconfig --name conduit-dev-cluster --region "$AWS_REGION"
 ./scripts/generate-terraform-values.sh dev
-helmfile -e dev -l name!=conduit-backend apply
+helmfile -e dev -l name!=conduit-backend apply --skip-diff-validation-on-install
 ```
+
+`--skip-diff-validation-on-install` matters here specifically for the AWS Load Balancer Controller chart: it bundles both a CRD (`IngressClassParams`) and an instance of it in the same release, and since nothing's ever been installed on a brand-new cluster, `helm-diff`'s K8s API validation has no way to recognize that CRD's kind yet when it tries to render a diff preview for the not-yet-installed release. This flag disables just that validation step for newly-installed releases - it still computes and shows a diff, unlike its blunter sibling `--skip-diff-on-install`.
 
 Verify everything comes up:
 ```bash

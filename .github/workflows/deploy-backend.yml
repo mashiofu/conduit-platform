@@ -129,6 +129,18 @@ jobs:
           done
           echo "hostname=$HOSTNAME" >> "$GITHUB_OUTPUT"
 
+      # Swap back to terraform-ci: the next step reads Terraform state
+      # (terraform output) and writes the SSM parameter - platform-ci
+      # (assumed above, and still active otherwise) is narrowly scoped
+      # to EKS access only and has neither permission. Hit live: 403 on
+      # both s3:ListBucket/PutObject (state) and ssm:PutParameter.
+      - name: Configure AWS credentials (terraform-ci, to publish the ALB hostname)
+        if: steps.alb.outputs.hostname != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TERRAFORM_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
       - name: Publish it for the frontend to read
         if: steps.alb.outputs.hostname != ''
         working-directory: terraform/live

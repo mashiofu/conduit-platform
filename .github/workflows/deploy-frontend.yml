@@ -72,6 +72,37 @@ jobs:
           URL=$(aws ssm get-parameter --name "$(terraform output -raw backend_url_parameter_name)" --query 'Parameter.Value' --output text 2>/dev/null || true)
           echo "backend_url=$URL" >> "$GITHUB_OUTPUT"
 
+      # The two apps' CD pipelines are triggered independently (each app
+      # repo dispatches its own deploy on its own schedule) and this
+      # frontend's deploy can simply finish before the backend's does -
+      # the backend's is slower (it also runs k6). On a brand new
+      # environment, or right after a full teardown/recreate, that means
+      # this frontend deploy can read the SSM value above before the
+      # backend has published its (new) ALB hostname - the value in SSM is
+      # then still whatever the *previous* environment's backend ALB was,
+      # which no longer exists. Baking that straight into env.js ships a
+      # frontend that loads fine but can never reach its API - confirmed
+      # live, exactly this way, after a fresh teardown+redeploy where both
+      # apps' cd.yml were triggered close together. Rather than trust the
+      # SSM value on faith, actually probe it - same idiom deploy-backend.yml
+      # already uses for its own ALB.
+      - name: Wait for the backend to actually be reachable at that URL
+        run: |
+          BACKEND_URL="${{ steps.tf.outputs.backend_url }}"
+          if [ -z "$BACKEND_URL" ]; then
+            echo "::error::backend_url_parameter_name has no value yet - the backend has never published to SSM in this environment. Deploy the backend first, then retry this frontend deploy."
+            exit 1
+          fi
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 "$BACKEND_URL/ping/" >/dev/null 2>&1; then
+              exit 0
+            fi
+            echo "backend not reachable at $BACKEND_URL yet, retrying... ($i/20)"
+            sleep 15
+          done
+          echo "::error::the backend URL published in SSM ($BACKEND_URL) never became reachable - it's likely stale, pointing at a torn-down environment. Re-deploy the backend, then retry this frontend deploy."
+          exit 1
+
       - name: Configure AWS credentials (platform-ci, for cluster access)
         uses: aws-actions/configure-aws-credentials@v4
         with:

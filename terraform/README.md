@@ -59,12 +59,10 @@ per-environment to configure in the backend itself.
 
 ## Bootstrapping remote state
 
-Nothing has been applied to AWS yet as of this writing (see
-`docs/design-decisions.md` - the team deferred that decision
-independently of writing the code). `live/` currently runs on local state
-(one state file per workspace under `terraform.tfstate.d/`) for exactly
-that reason - standing up even the state bucket is a real AWS action.
-When ready:
+One-time, per AWS account - standing up the state bucket is itself a
+real AWS action, deliberately separate from `live/`'s own apply (see
+`docs/design-decisions.md`). See `docs/DEPLOYMENT.md` step 1 for the
+full walkthrough; the commands themselves:
 
 ```bash
 cd bootstrap

@@ -130,6 +130,12 @@ jobs:
         if: steps.alb.outputs.hostname != ''
         run: |
           curl -fsS "http://${{ steps.alb.outputs.hostname }}/healthz"
-          curl -fsS "http://${{ steps.alb.outputs.hostname }}/" | grep -qi "<title>"
+          # Not `curl ... | grep -q` - grep -q exits the instant it finds
+          # a match, closing the pipe while curl is often still writing,
+          # which curl reports as "Failure writing output to destination"
+          # (harmless here, since the step's exit code follows the last
+          # command in the pipe, but a misleading, alarming log line).
+          INDEX_PAGE=$(curl -fsS "http://${{ steps.alb.outputs.hostname }}/")
+          echo "$INDEX_PAGE" | grep -qi "<title>"
           echo "env.js:"
           curl -fsS "http://${{ steps.alb.outputs.hostname }}/env.js"

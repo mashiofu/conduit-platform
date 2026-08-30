@@ -5,6 +5,6 @@ variable "aws_region" {
 }
 
 variable "state_bucket_name" {
-  description = "Globally-unique S3 bucket name to hold Terraform remote state for every other root module in this repo (terraform/envs/*)."
+  description = "Globally-unique S3 bucket name to hold Terraform remote state for every other root module in this repo (terraform/live/)."
   type        = string
 }

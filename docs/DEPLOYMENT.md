@@ -4,7 +4,7 @@ Every command below, in the order that actually works. Written to be run by a hu
 
 These are the exact three repos this platform was built and tested against - the app-level fixes documented in [`docs/design-decisions.md`](design-decisions.md) (Postgres support, CORS, the runtime-configurable frontend, and the rest) live in these specific forks, not in a fresh fork of upstream `gothinkster`/`realworld-apps`. Forking or cloning them (see below) is the only way to actually reproduce what's described here, rather than a generic RealWorld deployment that happens to look similar.
 
-**Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see [`docs/cost-estimate.md`](cost-estimate.md) (~$246/mo, ~$8/day for `dev`).
+**Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see [`docs/cost-estimate.md`](cost-estimate.md) (~$248/mo, ~$8/day for `dev`).
 
 **Contents**
 - [Prerequisites](#prerequisites)
@@ -260,7 +260,7 @@ curl http://<hostname-from-above>/api/ping/
 # Frontend - open in a browser
 kubectl get ingress conduit-frontend -n conduit-frontend
 ```
-Open that hostname in a browser and use the app - register, create an article, favorite something. Both tiers are plain HTTP ALBs (no TLS on either yet - see [`docs/design-decisions.md`](design-decisions.md)'s HTTPS entry for that deliberately-deferred gap), so there's no mixed-content mismatch between them to worry about.
+Open that hostname in a browser and use the app - register, create an article, favorite something. Both tiers are plain HTTP ALBs (no TLS on either yet - see [`docs/design-decisions.md`](design-decisions.md)'s HTTPS entry for that deliberately-deferred gap), so there's no mixed-content mismatch between them to worry about. **Type the `http://` scheme explicitly** (`http://k8s-....elb.amazonaws.com/`), rather than just the bare hostname - Chrome and Safari both try to upgrade a typed/bare address to HTTPS first, and since neither ALB has a port-443 listener at all, that attempt hangs instead of failing fast, showing up as a real `ERR_TIMED_OUT` until `http://` is given explicitly. Confirmed live, hit exactly this way on this project's own final verification pass - see [`design-decisions.md`](design-decisions.md)'s HTTPS entry for the full explanation.
 
 To confirm the backend specifically, independent of the browser:
 ```bash

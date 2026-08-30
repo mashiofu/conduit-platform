@@ -20,7 +20,7 @@ flowchart TB
                 Frontend["Frontend pods (nginx)<br/>HPA 2-4 replicas"]
             end
             subgraph nsBackend["ns: conduit-backend"]
-                Backend["Backend pods (Go/Gin)<br/>HPA 2-10 replicas"]
+                Backend["Backend pods (Go/Gin)<br/>HPA 2-4 replicas (3-10 in prod)"]
             end
             Prom["kube-prometheus-stack<br/>Prometheus + Grafana + Alertmanager"]
             ESO["External Secrets Operator"]

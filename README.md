@@ -23,7 +23,7 @@ Each app repo owns its own build/test/deploy pipeline; **this repo is the only o
 ```
 terraform/        AWS infrastructure - see terraform/README.md for the workspace workflow
 helm/             Platform add-ons (Helmfile) + the backend/frontend Helm charts - see helm/README.md
-scripts/          Cross-repo automation (GitHub Environment sync)
+scripts/          Cross-repo automation (GitHub Environment sync) + k6 perf-test scripts/baselines
 docs/
   DEPLOYMENT.md          the complete step-by-step guide to standing this up from scratch
   architecture.md        diagrams - runtime topology and CI/CD flow

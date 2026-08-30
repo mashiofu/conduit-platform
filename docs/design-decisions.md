@@ -80,6 +80,7 @@ Everything below was caught by actually running something - a build, a test, a `
 - AWS WAF in front of CloudFront/the ALB
 - A custom domain, ACM certificate, and HTTPS for the backend
 - Actually executing the backup/restore runbook against live infrastructure (written, not drilled)
+- The forked frontend's own `Security Tests` (XSS sanitization) and `Playwright Tests` (error-handling flows) currently fail - both are bugs in the app's own logic, not this project's infra/CI/CD, and the task brief is explicit that the app itself isn't evaluated. Left as-is rather than debugging Angular component/sanitization internals, which is a different skill area than everything else this repo covers.
 - A live pod/node-kill self-healing demonstration
 - Automatic ratcheting of the k6 performance baseline (currently a deliberate, human-reviewed commit - see `scripts/k6/compare-baseline.sh`)
 - A GitHub App (installation tokens) instead of a long-lived fine-grained PAT for cross-repo `repository_dispatch`

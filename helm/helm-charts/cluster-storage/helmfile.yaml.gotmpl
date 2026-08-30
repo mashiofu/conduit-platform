@@ -1,0 +1,13 @@
+releases:
+  - name: conduit-cluster-storage
+    # kube-system, same as this project's other cluster-level add-ons
+    # (aws-load-balancer-controller, cluster-autoscaler) - the StorageClass
+    # itself is cluster-scoped and ignores this, it's just where the
+    # release's own bookkeeping lives.
+    namespace: kube-system
+    # Local chart path, not a repositories.yaml.gotmpl entry - this is our
+    # own chart source (../../cluster-storage-chart), not a third-party one.
+    chart: ../../cluster-storage-chart
+    # No values: list - the StorageClass this chart renders is fully
+    # static, nothing in it varies per environment. Every other release
+    # here has a values.yaml.gotmpl because it needs one, not by habit.

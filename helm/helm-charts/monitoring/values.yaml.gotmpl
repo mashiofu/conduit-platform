@@ -9,6 +9,19 @@ prometheus:
       requests:
         cpu: {{ .Values.monitoring.prometheusRequestsCpu }}
         memory: {{ .Values.monitoring.prometheusRequestsMemory }}
+    # Without this, the operator falls back to an emptyDir - the retention
+    # setting above would only ever hold for as long as this pod happens
+    # not to restart. gp3 comes from the cluster-storage release (see
+    # helm-charts/cluster-storage/), applied before this one so the
+    # StorageClass already exists by the time this PVC is created.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: {{ .Values.monitoring.prometheusStorageSize }}
     # Discover ServiceMonitors/PrometheusRules cluster-wide instead of
     # only ones labeled for this chart's own release - simpler for a
     # single-team cluster like this one. A larger, multi-tenant cluster

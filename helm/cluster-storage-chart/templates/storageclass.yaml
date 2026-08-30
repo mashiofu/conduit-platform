@@ -1,0 +1,22 @@
+# The default gp3 StorageClass EKS doesn't create for you. The
+# aws-ebs-csi-driver EKS addon (see terraform/modules/eks/iam-pod-identity.tf)
+# provisions the CSI driver itself but never a StorageClass to go with it -
+# without this, nothing in the cluster has a working default to bind a PVC
+# against (see kube-prometheus-stack's Prometheus storageSpec, the reason
+# this chart exists at all).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+reclaimPolicy: Delete
+# Pod scheduling decides which AZ a volume actually needs to live in; a
+# volume provisioned before that's known could land in the wrong AZ for
+# wherever the pod ends up. WaitForFirstConsumer defers provisioning until
+# a pod claiming this storage is actually scheduled.
+volumeBindingMode: WaitForFirstConsumer

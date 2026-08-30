@@ -5,6 +5,7 @@ monitoring:
   prometheusRetention: 14d
   prometheusRequestsCpu: 250m
   prometheusRequestsMemory: 512Mi
+  prometheusStorageSize: 20Gi
 
 backend:
   minReplicas: 2

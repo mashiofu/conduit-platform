@@ -8,14 +8,16 @@ other's state.
 
 ```
 helm/
-  helmfile.yaml.gotmpl   # entry point - composes the six releases below
+  helmfile.yaml.gotmpl   # entry point - composes the seven releases below
   environments.yaml      # dev/staging/prod, matching the Terraform workspaces
   common.yaml             # values shared by every environment
   dev.yaml, staging.yaml, prod.yaml   # static per-environment values
   *.generated.yaml        # gitignored - apply-time values from Terraform, see scripts/
   backend-chart/          # the backend's own Helm chart (Deployment/HPA/PDB/NetworkPolicy/...)
   frontend-chart/         # same shape, for the frontend
+  cluster-storage-chart/  # one static StorageClass (gp3) - see helm-charts/cluster-storage/
   helm-charts/
+    cluster-storage/      # release wrapper around ../../cluster-storage-chart, applied first
     aws-load-balancer-controller/
     external-secrets/
     cluster-autoscaler/
@@ -28,15 +30,20 @@ helm/
 
 Each `helm-charts/<name>/` is a self-contained mini-Helmfile:
 `repositories.yaml.gotmpl` (that chart's repo, for the four third-party
-add-ons - `backend`/`frontend` point at the local `../../*-chart`
-sources instead) and `helmfile.yaml.gotmpl` (the release itself,
-`bases:`-merged with the repository file) plus `values.yaml.gotmpl`
-(templated against the environment's merged values). Adding a new
+add-ons - `backend`/`frontend`/`cluster-storage` point at their own local
+`../../*-chart` sources instead) and `helmfile.yaml.gotmpl` (the release
+itself, `bases:`-merged with the repository file) plus, where the chart
+actually needs one, `values.yaml.gotmpl` (templated against the
+environment's merged values - `cluster-storage` skips this file entirely,
+since its one `StorageClass` object is fully static). Adding a new
 release means adding one such directory and one line in the top-level
 `helmfile.yaml.gotmpl`'s `helmfiles:` list - not editing a single
 growing file. `backend` and `frontend` each install into their own
 namespace (`conduit-backend`/`conduit-frontend`, `createNamespace: true`)
 rather than `default` - see `docs/design-decisions.md` for why.
+`cluster-storage` is listed first, deliberately: `monitoring`'s
+Prometheus PVC needs the `gp3` `StorageClass` it creates to already
+exist, and nested `helmfiles:` entries apply in the order listed.
 
 ## Why not SOPS
 

@@ -220,6 +220,17 @@ resource "aws_eks_addon" "cloudwatch_observability" {
   depends_on = [aws_eks_node_group.this, aws_eks_pod_identity_association.cloudwatch_observability]
 }
 
+resource "aws_eks_addon" "ebs_csi_driver" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "aws-ebs-csi-driver"
+  tags         = var.tags
+
+  # Same reasoning as cloudwatch_observability above: the controller pod
+  # needs its Pod Identity association wired before it comes up, not
+  # after - it can't provision/attach any EBS volume without it.
+  depends_on = [aws_eks_node_group.this, aws_eks_pod_identity_association.ebs_csi_driver]
+}
+
 # ---- Node <-> data tier: the security group RDS/ElastiCache actually
 # grant ingress to. EKS creates and manages this one itself (the "cluster
 # security group") - reusing it instead of hand-rolling a parallel one. ----

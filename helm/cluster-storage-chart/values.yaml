@@ -1,0 +1,2 @@
+# No values - templates/storageclass.yaml is fully static, nothing here
+# to configure. This file exists only because `helm lint` expects one.

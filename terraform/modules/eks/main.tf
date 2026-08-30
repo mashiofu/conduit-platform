@@ -213,7 +213,11 @@ resource "aws_eks_addon" "cloudwatch_observability" {
   addon_name   = "amazon-cloudwatch-observability"
   tags         = var.tags
 
-  depends_on = [aws_eks_node_group.this]
+  # Pod Identity association first (see iam-pod-identity.tf) - without
+  # it, this addon's pods start with no way to authenticate to
+  # CloudWatch at all and just fail every log/metric write forever,
+  # not a transient startup race that resolves on its own.
+  depends_on = [aws_eks_node_group.this, aws_eks_pod_identity_association.cloudwatch_observability]
 }
 
 # ---- Node <-> data tier: the security group RDS/ElastiCache actually

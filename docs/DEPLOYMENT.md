@@ -324,6 +324,18 @@ aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName'
 aws eks describe-cluster --name conduit-dev-cluster   # should error: cluster not found
 ```
 
+**Then clean up the handful of things `terraform destroy`'s summary count won't include, because Terraform never created them in the first place** (see [`docs/design-decisions.md`](design-decisions.md) for why each one exists outside Terraform's tracking): the Container Insights log groups the CloudWatch Observability addon wrote to at runtime, RDS's own exported log group, and the `BACKEND_URL` SSM parameter CI wrote directly (unlike `JWT_SECRET`, never a Terraform resource):
+```bash
+for lg in "/aws/containerinsights/conduit-<env>-cluster/application" \
+          "/aws/containerinsights/conduit-<env>-cluster/dataplane" \
+          "/aws/containerinsights/conduit-<env>-cluster/host" \
+          "/aws/containerinsights/conduit-<env>-cluster/performance" \
+          "/aws/rds/instance/conduit-<env>-postgres/postgresql"; do
+  aws logs delete-log-group --log-group-name "$lg"
+done
+aws ssm delete-parameter --name "/conduit/<env>/BACKEND_URL"
+```
+
 The `alb-logs` S3 bucket destroys cleanly on its own (`force_destroy = true` - everything in it is auto-generated and already expires after 30 days, unlike the old CDN frontend bucket this project used to have, which needed its versions and delete markers purged by hand first). The Terraform state bucket (`bootstrap/`) is untouched by `terraform destroy` in `live/` - it's a separate root module, deliberately, and tearing it down (if wanted at all) is its own explicit step in `bootstrap/`, not implied by this one.
 
 ## Tearing down the state bucket itself (optional, and truly last)

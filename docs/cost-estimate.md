@@ -2,6 +2,10 @@
 
 Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev has been applied and tested end to end against real AWS** (staging/prod have not) - the dev column below reflects real spend actually incurred, not just a projection, including the EBS volume backing Prometheus's PVC and the logging additions below (all confirmed live - see `docs/design-decisions.md`).
 
+**Contents**
+- [What actually drives the difference between environments](#what-actually-drives-the-difference-between-environments)
+- [Practical recommendation](#practical-recommendation)
+
 | | dev | staging | prod |
 |---|---:|---:|---:|
 | EKS control plane | $73 | $73 | $73 |

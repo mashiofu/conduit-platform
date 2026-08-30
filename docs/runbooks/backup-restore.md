@@ -1,5 +1,13 @@
 # Backup & Restore
 
+**Contents**
+- [What's backed up, and why](#whats-backed-up-and-why)
+- [Restoring RDS](#restoring-rds)
+  - [Path A: point-in-time recovery](#path-a-point-in-time-recovery-the-common-case---undo-the-last-n-hoursdays)
+  - [Path B: restore from a specific snapshot](#path-b-restore-from-a-specific-automated-or-manual-snapshot)
+  - [Cutover, either path](#cutover-either-path)
+- [Recovering the frontend](#recovering-the-frontend)
+
 ## What's backed up, and why
 
 | Tier | Backed up? | Mechanism |

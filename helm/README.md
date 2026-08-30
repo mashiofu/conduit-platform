@@ -6,6 +6,10 @@ resources (including the EKS cluster and each add-on's IRSA role);
 Helmfile owns what actually runs on the cluster. Neither tool touches the
 other's state.
 
+**Contents**
+- [Why not SOPS](#why-not-sops)
+- [Usage](#usage)
+
 ```
 helm/
   helmfile.yaml.gotmpl   # entry point - composes the seven releases below

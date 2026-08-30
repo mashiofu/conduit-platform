@@ -1,5 +1,12 @@
 # conduit-platform/terraform
 
+**Contents**
+- [Environments: Terraform workspaces, not directories](#environments-terraform-workspaces-not-directories)
+  - [Using it](#using-it)
+- [Bootstrapping remote state](#bootstrapping-remote-state)
+- [Provider version pinning](#provider-version-pinning)
+- [Testing](#testing)
+
 ```
 terraform/
   bootstrap/   # one-time: the S3 bucket that live/ uses as its remote state backend

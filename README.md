@@ -2,6 +2,12 @@
 
 The platform layer for **Conduit** (a RealWorld/"Medium clone" app) - Terraform, Helm/Helmfile, CI/CD, and observability for a Go backend and Angular frontend running on EKS. Built for a DevOps take-home; the app itself is explicitly not what's evaluated (see the task brief), so most of the interesting work here is making a demo app's infrastructure genuinely production-adjacent rather than the app code.
 
+**Contents**
+- [The three repos](#the-three-repos)
+- [Layout](#layout)
+- [Reproducing this from scratch](#reproducing-this-from-scratch)
+- [Where to start reading](#where-to-start-reading)
+
 ## The three repos
 
 | Repo | Owns |

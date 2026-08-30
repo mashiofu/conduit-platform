@@ -241,12 +241,41 @@ Open `localhost:3000`, log in as `admin` with that password, open the **Conduit 
 
 ## Tearing down
 
-**Order matters.** Helm-managed resources first, or the ALB the Load Balancer Controller created gets orphaned and blocks the VPC from deleting:
+**Order matters, in both directions.** Helm-managed resources have to go first, or the ALB the Load Balancer Controller created gets orphaned and blocks the VPC from deleting. But one Helm-managed resource has to be dealt with *before* that, while the cluster (and the EBS CSI driver running on it) still exists to actually process it:
 
 ```bash
+# 1. Prometheus's PVC first, specifically - kube-prometheus-stack's
+#    Prometheus is a StatefulSet, and Kubernetes deliberately does NOT
+#    delete a StatefulSet's own PVC when the StatefulSet is removed (a
+#    data-loss safeguard, not a bug). `helmfile destroy` below will
+#    happily remove the Prometheus release and leave this PVC - and the
+#    real EBS volume behind it - orphaned. Terraform never created or
+#    tracks this volume (it's entirely Helm/Kubernetes-managed), so
+#    `terraform destroy` won't touch it either - it just keeps costing
+#    money, silently, forever, unless it's deleted here, now, while the
+#    cluster's EBS CSI driver is still running to actually action the
+#    delete.
+kubectl delete pvc -n monitoring -l app.kubernetes.io/name=prometheus
+
+# Confirm it's actually gone before moving on - both should return nothing:
+kubectl get pvc -A
+kubectl get pv
+
+# 2. Now the rest of the Helm-managed resources:
 cd conduit-platform/helm
 helmfile -e dev destroy
 
+# 3. Then Terraform:
 cd ../terraform/live
 terraform destroy
 ```
+
+**After it finishes, verify nothing was left behind rather than trust the exit code alone** - this project has hit exactly this class of surprise before (see `docs/design-decisions.md`):
+```bash
+# Should return nothing:
+aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes[].[VolumeId,Tags]'
+aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName'
+aws eks describe-cluster --name conduit-dev-cluster   # should error: cluster not found
+```
+
+The `alb-logs` S3 bucket destroys cleanly on its own (`force_destroy = true` - everything in it is auto-generated and already expires after 30 days, unlike the old CDN frontend bucket this project used to have, which needed its versions and delete markers purged by hand first). The Terraform state bucket (`bootstrap/`) is untouched by `terraform destroy` in `live/` - it's a separate root module, deliberately, and tearing it down (if wanted at all) is its own explicit step in `bootstrap/`, not implied by this one.

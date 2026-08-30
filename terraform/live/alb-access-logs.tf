@@ -9,6 +9,14 @@
 resource "aws_s3_bucket" "alb_access_logs" {
   bucket = "${local.name_prefix}-alb-logs-${data.aws_caller_identity.live.account_id}"
   tags   = local.common_tags
+
+  # Everything in this bucket is auto-generated (ALB's own delivery, plus
+  # the AWS-written ELBAccessLogTestFile) and already expires in 30 days
+  # on its own - nothing here is worth a manual "empty the bucket first"
+  # step before `terraform destroy`, unlike the old CDN frontend bucket
+  # this project used to have (see docs/design-decisions.md's teardown
+  # note). Set here instead of hit live during an actual teardown.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "alb_access_logs" {

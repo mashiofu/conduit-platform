@@ -58,3 +58,20 @@ resource "aws_cloudwatch_query_definition" "errors_across_all_pods" {
     | limit 100
   EOT
 }
+
+# Against modules/network's VPC Flow Log group (REJECT-only - see that
+# module for why), not Container Insights like the four queries above.
+# The question this answers: "what's actually being blocked, and by
+# what" - a tight security group, a NetworkPolicy denying more than
+# intended, or a genuine scan/probe against the ALB's public IP.
+resource "aws_cloudwatch_query_definition" "vpc_flow_log_rejects" {
+  name            = "${local.name_prefix}/network-rejected-connections"
+  log_group_names = [module.network.flow_log_group_name]
+  query_string    = <<-EOT
+    fields @timestamp, srcAddr, dstAddr, dstPort, protocol, action
+    | filter action = "REJECT"
+    | stats count(*) as reject_count by srcAddr, dstAddr, dstPort
+    | sort reject_count desc
+    | limit 50
+  EOT
+}

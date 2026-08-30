@@ -158,6 +158,21 @@ resource "aws_eks_node_group" "this" {
     max_unavailable = 1
   }
 
+  # Cluster Autoscaler changes desired_size directly against the ASG API
+  # as pods actually schedule - that's the whole point of running it.
+  # Without ignoring it here, every subsequent terraform plan/apply
+  # fights that live decision back down to var.node_desired_size's
+  # static baseline, which is only meant as this node group's initial
+  # size, not a ceiling Terraform re-enforces forever. Found live, not
+  # by inspection: a plan run for an unrelated change showed
+  # "desired_size = 3 -> 2" - the autoscaler had legitimately scaled up
+  # to 3 for real scheduling pressure, and applying that diff as-is
+  # would have silently scaled it back down and evicted pods for no
+  # reason connected to the actual change being applied.
+  lifecycle {
+    ignore_changes = [scaling_config[0].desired_size]
+  }
+
   # Propagates to the underlying (EKS-managed) ASG, which is how Cluster
   # Autoscaler auto-discovers this node group instead of needing it
   # hardcoded into the Helm release's values.

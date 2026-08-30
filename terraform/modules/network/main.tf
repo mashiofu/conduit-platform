@@ -146,3 +146,67 @@ resource "aws_vpc_endpoint" "s3" {
 
   tags = merge(var.tags, { Name = "${var.name_prefix}-s3-endpoint" })
 }
+
+# ---- VPC Flow Logs: the network tier's own log, not covered by the
+# CloudWatch Observability addon (pod logs) or RDS/ElastiCache's own log
+# exports - "all relevant logs from all tiers" was silently missing
+# network-level visibility entirely until this. REJECT-only, not ALL:
+# same reasoning as ElastiCache's slow-log-only export - the
+# operationally relevant question here is "what got blocked and why"
+# (a security group too tight, a NetworkPolicy misconfigured), not a
+# full packet-flow record of every already-allowed connection, which
+# would be a large, mostly-uninteresting volume of logs on a cluster
+# this size. ----
+
+resource "aws_cloudwatch_log_group" "vpc_flow_log" {
+  name              = "/aws/vpc/${var.name_prefix}/flow-log"
+  retention_in_days = 14
+  tags              = var.tags
+}
+
+data "aws_iam_policy_document" "vpc_flow_log_trust" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "vpc_flow_log" {
+  name               = "${var.name_prefix}-vpc-flow-log"
+  assume_role_policy = data.aws_iam_policy_document.vpc_flow_log_trust.json
+  tags               = var.tags
+}
+
+data "aws_iam_policy_document" "vpc_flow_log_permissions" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+    ]
+    resources = ["${aws_cloudwatch_log_group.vpc_flow_log.arn}:*"]
+  }
+}
+
+resource "aws_iam_role_policy" "vpc_flow_log" {
+  name   = "${var.name_prefix}-vpc-flow-log-permissions"
+  role   = aws_iam_role.vpc_flow_log.id
+  policy = data.aws_iam_policy_document.vpc_flow_log_permissions.json
+}
+
+resource "aws_flow_log" "this" {
+  vpc_id               = aws_vpc.this.id
+  traffic_type         = "REJECT"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.vpc_flow_log.arn
+  iam_role_arn         = aws_iam_role.vpc_flow_log.arn
+
+  tags = merge(var.tags, { Name = "${var.name_prefix}-vpc-flow-log" })
+}

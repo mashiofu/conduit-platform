@@ -32,8 +32,6 @@ spec:
               value: release
             - name: REDIS_ADDR
               value: {{ .Values.aws.redisAddr | quote }}
-            - name: FRONTEND_ORIGIN
-              value: {{ .Values.aws.frontendOrigin | quote }}
           envFrom:
             # DATABASE_URL and JWT_SECRET, synced by External Secrets
             # Operator - see externalsecret.yaml. Never set directly here.

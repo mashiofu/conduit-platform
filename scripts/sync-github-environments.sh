@@ -102,14 +102,23 @@ fi
 echo "=== $FRONTEND_REPO ($ENV) ==="
 ensure_environment "$FRONTEND_REPO" "$ENV"
 set_env_var "$FRONTEND_REPO" "$ENV" AWS_ROLE_ARN "$(val github_actions_frontend_role_arn)"
+set_env_var "$FRONTEND_REPO" "$ENV" ECR_REPOSITORY_URL "$(val ecr_frontend_repository_url)"
+set_env_var "$FRONTEND_REPO" "$ENV" AWS_REGION "$REGION"
+set_env_var "$FRONTEND_REPO" "$ENV" PLATFORM_REPO "$OWNER/$PLATFORM_REPO"
+set_env_var "$FRONTEND_REPO" "$ENV" BACKEND_URL_PARAMETER_NAME "$(val backend_url_parameter_name)"
+# Flat copy of dev's ECR URL specifically - same reasoning as the
+# backend section above: promote.yml's staging/prod jobs run under the
+# target environment, but still need to know where to copy *from*.
+if [ "$ENV" = "dev" ]; then
+  set_repo_var "$FRONTEND_REPO" ECR_REPOSITORY_URL_DEV "$(val ecr_frontend_repository_url)"
+fi
+
+# --- Superseded by the containerized frontend above (see
+# docs/design-decisions.md) - left in place only until module.cdn_frontend
+# itself is retired in a follow-up change, not because anything still
+# reads these. ---
 set_env_var "$FRONTEND_REPO" "$ENV" FRONTEND_BUCKET_NAME "$(val frontend_bucket_name)"
 set_env_var "$FRONTEND_REPO" "$ENV" CLOUDFRONT_DISTRIBUTION_ID "$(val frontend_distribution_id)"
-set_env_var "$FRONTEND_REPO" "$ENV" AWS_REGION "$REGION"
-set_env_var "$FRONTEND_REPO" "$ENV" BACKEND_URL_PARAMETER_NAME "$(val backend_url_parameter_name)"
-# Flat copy of dev's own bucket name - same reasoning as
-# ECR_REPOSITORY_URL_DEV above: promote.yml's staging/prod jobs run under
-# the target environment, but still need to know dev's bucket name to
-# copy *from*.
 if [ "$ENV" = "dev" ]; then
   set_repo_var "$FRONTEND_REPO" DEV_FRONTEND_BUCKET_NAME "$(val frontend_bucket_name)"
 fi

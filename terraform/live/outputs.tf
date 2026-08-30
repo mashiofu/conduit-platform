@@ -10,6 +10,10 @@ output "ecr_backend_repository_url" {
   value = module.ecr_backend.repository_url
 }
 
+output "ecr_frontend_repository_url" {
+  value = module.ecr_frontend.repository_url
+}
+
 output "github_actions_backend_role_arn" {
   value = module.github_role_backend.role_arn
 }

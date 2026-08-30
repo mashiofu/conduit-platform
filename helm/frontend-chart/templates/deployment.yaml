@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "conduit-frontend.fullname" . }}
+  labels:
+    {{- include "conduit-frontend.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "conduit-frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "conduit-frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "conduit-frontend.serviceAccountName" . }}
+      containers:
+        - name: conduit-frontend
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            # Regenerated into env.js by docker-entrypoint.d/40-inject-env.sh
+            # at container start, not baked in at build time - the same
+            # image works for dev/staging/prod, just with this value
+            # changed per Helm release.
+            - name: API_URL
+              value: {{ .Values.apiUrl | quote }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

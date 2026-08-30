@@ -1,0 +1,30 @@
+{{- if .Values.ingress.enabled }}
+# Deliberately its own ALB, not shared with the backend's Ingress via an
+# IngressGroup - simpler to reason about than coordinating path routing
+# across two separately-deployed Helm releases, at the cost of a second
+# ALB (~$16-20/mo, same trade-off backend already accepts for its own).
+# Same HTTP-only caveat as the backend's Ingress applies here too now
+# that CloudFront (which supplied free HTTPS termination) is retired -
+# see docs/design-decisions.md.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "conduit-frontend.fullname" . }}
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "conduit-frontend.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

@@ -20,4 +20,3 @@ aws:
   rdsDatabaseName: {{ .Values.rdsDatabaseName }}
   redisAddr: "{{ .Values.redisEndpoint }}:6379"
   ssmJwtSecretPath: "/{{ .Values.project }}/{{ .Environment.Name }}/JWT_SECRET"
-  frontendOrigin: {{ .Values.frontendOrigin }}

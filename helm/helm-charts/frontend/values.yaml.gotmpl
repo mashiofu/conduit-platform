@@ -1,0 +1,9 @@
+# image.tag and apiUrl are deliberately not set here, same reasoning as
+# the backend's values.yaml.gotmpl (see docs/design-decisions.md for the
+# --state-values-set incident this avoids): both are passed at deploy
+# time via `helmfile apply --set image.tag=... --set apiUrl=...`,
+# applied directly to the final Helm values rather than through
+# Helmfile's own state-values layer, which renders before CLI overrides
+# are merged in and would silently never see them.
+image:
+  repository: {{ .Values.ecrFrontendRepositoryUrl }}

@@ -129,8 +129,9 @@ locals {
   # "what dev's would be named" without depending on it. Used only to
   # grant staging/prod's CI roles read access to dev's already-built
   # artifacts during promotion (see the app repos' promote.yml).
-  dev_ecr_repository_arn  = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.live.account_id}:repository/${var.project}-dev-backend"
-  dev_frontend_bucket_arn = "arn:aws:s3:::${var.project}-dev-frontend-${var.github_org}"
+  dev_ecr_repository_arn          = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.live.account_id}:repository/${var.project}-dev-backend"
+  dev_ecr_frontend_repository_arn = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.live.account_id}:repository/${var.project}-dev-frontend"
+  dev_frontend_bucket_arn         = "arn:aws:s3:::${var.project}-dev-frontend-${var.github_org}"
 }
 
 data "aws_caller_identity" "live" {}
@@ -152,6 +153,20 @@ module "ecr_backend" {
   depends_on = [terraform_data.workspace_guard]
 
   name = "${local.name_prefix}-backend"
+  tags = local.common_tags
+}
+
+# The frontend's own image repo, now that it's containerized and running
+# on EKS instead of a static S3/CloudFront build - see
+# docs/design-decisions.md. module.cdn_frontend (below) stays in place
+# for now, retired in a separate follow-up once this path is confirmed
+# working end to end, not removed in the same change that adds its
+# replacement.
+module "ecr_frontend" {
+  source     = "../modules/ecr"
+  depends_on = [terraform_data.workspace_guard]
+
+  name = "${local.name_prefix}-frontend"
   tags = local.common_tags
 }
 
@@ -190,10 +205,21 @@ module "github_role_frontend" {
   github_repos       = [var.frontend_github_repo]
   github_environment = local.cfg.github_environment
 
+  # S3/CloudFront perms kept for now alongside the new ECR ones below -
+  # module.cdn_frontend itself is still in place during the transition
+  # to a containerized frontend (see its own comment). Remove both
+  # together once that transition is confirmed working.
   frontend_bucket_arn         = module.cdn_frontend.bucket_arn
   cloudfront_distribution_arn = module.cdn_frontend.distribution_arn
-  ssm_read_parameter_arn      = local.backend_url_parameter_arn
   s3_read_bucket_arn          = local.environment == "dev" ? null : local.dev_frontend_bucket_arn
+
+  ssm_read_parameter_arn = local.backend_url_parameter_arn
+
+  ecr_repository_arns = [module.ecr_frontend.repository_arn]
+  # Only staging/prod need to read dev's repo (the promotion source);
+  # dev promoting from itself would be meaningless - same pattern as
+  # the backend's role above.
+  ecr_pull_only_repository_arns = local.environment == "dev" ? [] : [local.dev_ecr_frontend_repository_arn]
 
   tags = local.common_tags
 }

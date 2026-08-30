@@ -32,11 +32,11 @@ OUT_FILE="$HELM_DIR/${ENV}.generated.yaml"
       externalSecretsRoleArn:   .eks_external_secrets_role_arn.value,
       clusterAutoscalerRoleArn: .eks_cluster_autoscaler_role_arn.value,
       ecrBackendRepositoryUrl:  .ecr_backend_repository_url.value,
+      ecrFrontendRepositoryUrl: .ecr_frontend_repository_url.value,
       rdsSecretArn:             .rds_master_user_secret_arn.value,
       rdsEndpoint:              .rds_endpoint.value,
       rdsDatabaseName:          .rds_database_name.value,
-      redisEndpoint:            .redis_endpoint.value,
-      frontendOrigin:           "https://\(.frontend_distribution_domain_name.value)"
+      redisEndpoint:            .redis_endpoint.value
     }
     | to_entries
     | map("\(.key): \(.value | tostring | @json)")

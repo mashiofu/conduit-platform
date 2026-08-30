@@ -1,0 +1,49 @@
+# Defaults - the frontend Helmfile release (../helm-charts/frontend/) overrides
+# the per-environment ones (image.repository, replica counts, apiUrl) from
+# Terraform outputs and common.yaml/<env>.yaml. Nothing here should need
+# hand-editing per environment; that's what values.yaml.gotmpl is for.
+
+image:
+  repository: "" # set from terraform output ecr_frontend_repository_url
+  tag: "latest" # set by CI to the deployed commit's git SHA
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  port: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  name: conduit-frontend
+
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+
+# The backend's real API URL, e.g. http://<alb-hostname>/api - bridged
+# in from SSM at deploy time (deploy-frontend.yml), same value the old
+# S3-based env.js injection used. Baked into the container as an env var
+# at container *start*, not build time (see docker-entrypoint.d/
+# 40-inject-env.sh in the frontend repo) - one built image works for
+# any environment.
+apiUrl: ""

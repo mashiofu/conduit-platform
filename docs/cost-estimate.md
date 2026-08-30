@@ -1,6 +1,6 @@
 # Cost Estimate
 
-Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev has been applied and tested end to end against real AWS** (staging/prod have not) - the dev column below reflects real spend actually incurred, not just a projection, including the EBS volume backing Prometheus's PVC (confirmed `Bound` and mounted, not just planned - see `docs/design-decisions.md`).
+Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev has been applied and tested end to end against real AWS** (staging/prod have not) - the dev column below reflects real spend actually incurred, not just a projection, including the EBS volume backing Prometheus's PVC and the logging additions below (all confirmed live - see `docs/design-decisions.md`).
 
 | | dev | staging | prod |
 |---|---:|---:|---:|
@@ -11,14 +11,13 @@ Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes a
 | ElastiCache | $12 (t4g.micro) | $24 (t4g.small) | $50 (t4g.medium) |
 | ALB × 2 (backend + frontend) | $40 | $40 | $50 |
 | EBS (Prometheus PVC, `gp3`) | ~$1 (10Gi) | ~$2 (20Gi) | ~$4 (50Gi) |
+| VPC Flow Logs + ALB access logs (S3) | ~$1 | ~$2 | ~$3 |
 | ECR (backend + frontend) + Secrets Manager + CloudWatch Logs | ~$12 | ~$12 | ~$15 |
-| **Total (continuous)** | **~$247/mo (~$8/day)** | **~$273/mo (~$9/day)** | **~$618/mo (~$21/day)** |
+| **Total (continuous)** | **~$248/mo (~$8/day)** | **~$275/mo (~$9/day)** | **~$621/mo (~$21/day)** |
 
-Each tier gets its own ALB (see `docs/design-decisions.md` for why the frontend is containerized rather than served from a CDN) - a static-asset CDN would have been cheaper than a second load balancer, but wasn't what the take-home brief's literal wording called for. Frontend's own compute cost is close to zero on top of this - its pods (2× 50m CPU / 64Mi memory) run on node capacity the cluster already has for the backend, not new nodes. The EBS row is what backs Prometheus's actual metrics storage (see `docs/design-decisions.md`) - small in absolute terms next to everything else here, but a real, easy-to-miss line item once Prometheus stops using an ephemeral `emptyDir`.
+Each tier gets its own ALB (see `docs/design-decisions.md` for why the frontend is containerized rather than served from a CDN) - a static-asset CDN would have been cheaper than a second load balancer, but wasn't what the take-home brief's literal wording called for. Frontend's own compute cost is close to zero on top of this - its pods (2× 50m CPU / 64Mi memory) run on node capacity the cluster already has for the backend, not new nodes. The EBS row is what backs Prometheus's actual metrics storage (see `docs/design-decisions.md`) - small in absolute terms next to everything else here, but a real, easy-to-miss line item once Prometheus stops using an ephemeral `emptyDir`. The flow-logs/access-logs row is a genuine estimate, not a measurement - both were confirmed actually delivering entries only minutes before this was written, not long enough to know real volume; REJECT-only flow logs and 30-day S3 lifecycle expiration on the access logs both keep whatever the real number turns out to be small.
 
-Two more additions aren't in the table above yet: VPC Flow Logs (CloudWatch Logs ingestion, REJECT-only) and an S3 bucket for ALB access logs (see `docs/design-decisions.md`) - both written and validated, not yet applied. Rough added cost once they are: ~$1-2/mo per environment, small enough next to everything else here that it's not worth its own row until it's confirmed live rather than estimated.
-
-**All three running simultaneously: ~$1,138/mo (~$38/day).** That number is the actual reason `terraform.yml` gates every `apply` behind a GitHub Environment approval rather than auto-applying on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to. State itself is real and remote (S3, versioned, locked) regardless of which environments are actually up - that's a separate concern from whether the infrastructure those environments describe is running.
+**All three running simultaneously: ~$1,144/mo (~$38/day).** That number is the actual reason `terraform.yml` gates every `apply` behind a GitHub Environment approval rather than auto-applying on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to. State itself is real and remote (S3, versioned, locked) regardless of which environments are actually up - that's a separate concern from whether the infrastructure those environments describe is running.
 
 ## What actually drives the difference between environments
 

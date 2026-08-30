@@ -120,7 +120,7 @@ terraform workspace new dev      # if `dev` isn't in that list
 terraform apply
 ```
 
-Review the plan, type `yes`. This provisions the VPC, EKS cluster + node group, RDS, ElastiCache, two ECR repos (backend + frontend), every IAM role (trust-scoped to `$GITHUB_ORG`'s repos - this is where `deploy.env` actually matters, not just cosmetically, plus EKS Pod Identity roles for the CloudWatch Observability and EBS CSI driver addons), a CloudWatch log group for Redis's slow-log, VPC Flow Logs, an S3 bucket for ALB access logs, the `JWT_SECRET` SSM parameter, and the CloudWatch saved queries - 111 resources confirmed via `terraform state list` against this project's own `dev` state, **plus 9 more** (VPC Flow Logs and the ALB access-logs bucket) written and validated via `terraform plan` but not yet applied there. The EKS cluster + node group is what makes this slow (10-15 minutes is normal); everything else is fast.
+Review the plan, type `yes`. This provisions the VPC, EKS cluster + node group, RDS, ElastiCache, two ECR repos (backend + frontend), every IAM role (trust-scoped to `$GITHUB_ORG`'s repos - this is where `deploy.env` actually matters, not just cosmetically, plus EKS Pod Identity roles for the CloudWatch Observability and EBS CSI driver addons), a CloudWatch log group for Redis's slow-log, VPC Flow Logs, an S3 bucket for ALB access logs, the `JWT_SECRET` SSM parameter, and the CloudWatch saved queries - **124 resources** (confirmed via `terraform state list` against this project's own `dev` state). The EKS cluster + node group is what makes this slow (10-15 minutes is normal); everything else is fast.
 
 When it finishes, sanity-check the cluster exists:
 ```bash

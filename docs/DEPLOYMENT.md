@@ -2,7 +2,7 @@
 
 Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see [`docs/design-decisions.md`](design-decisions.md): standing up real AWS infrastructure was a deliberate, separate decision from writing the code).
 
-These are the exact three repos this platform was built and tested against - the app-level fixes documented in [`docs/design-decisions.md`](design-decisions.md) (Postgres support, CORS, the runtime-configurable frontend, and the rest) live in these specific forks, not in a fresh fork of upstream `gothinkster`/`realworld-apps`. Cloning them directly is the only way to actually reproduce what's described here, rather than a generic RealWorld deployment that happens to look similar.
+These are the exact three repos this platform was built and tested against - the app-level fixes documented in [`docs/design-decisions.md`](design-decisions.md) (Postgres support, CORS, the runtime-configurable frontend, and the rest) live in these specific forks, not in a fresh fork of upstream `gothinkster`/`realworld-apps`. Forking or cloning them (see below) is the only way to actually reproduce what's described here, rather than a generic RealWorld deployment that happens to look similar.
 
 **Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see [`docs/cost-estimate.md`](cost-estimate.md) (~$246/mo, ~$8/day for `dev`).
 
@@ -29,7 +29,19 @@ These are the exact three repos this platform was built and tested against - the
 
 ### Get the three repos
 
-Clone all three **as siblings under the same parent directory** - not optional, two real things depend on this exact layout: `docker-compose.yml` (local dev, optional) builds the other two repos via relative paths (`../golang-gin-realworld-example-app`, `../angular-realworld-example-app`), and step 7 below `cd`s between all three the same way.
+**If you want to actually run this end to end - push code, let CI build it, watch it deploy (step 7 onward) - fork these three into your own GitHub account first, then clone your fork.** A plain clone of mine doesn't give you push access, and steps 4-8 need it: they set up GitHub Environments, secrets, and workflow dispatches against wherever these repos actually live. `gh repo fork <repo> --clone` (part of the `gh` CLI already in the Prerequisites table below) does both in one step - forks under your own account, then clones that fork locally:
+
+```bash
+mkdir -p ~/conduit && cd ~/conduit
+
+gh repo fork mashiofu/conduit-platform --clone
+gh repo fork mashiofu/golang-gin-realworld-example-app --clone
+gh repo fork mashiofu/angular-realworld-example-app --clone
+```
+
+Then set `GITHUB_ORG` in `deploy.env` (step 0 below) to your own GitHub username or org - `BACKEND_REPO`/`FRONTEND_REPO`/`PLATFORM_REPO` only need changing if you also renamed a fork.
+
+**Only want to stand up the infrastructure against your own AWS account, without ever pushing code or touching CI/CD yourself?** A plain, read-only clone is enough for that - everything through the app going live (steps 0-3, 6, 9) only needs your own AWS credentials, not any access to these GitHub repos beyond a public clone:
 
 ```bash
 mkdir -p ~/conduit && cd ~/conduit
@@ -39,7 +51,7 @@ git clone https://github.com/mashiofu/golang-gin-realworld-example-app.git
 git clone https://github.com/mashiofu/angular-realworld-example-app.git
 ```
 
-You should end up with:
+Either way, clone all three **as siblings under the same parent directory** - not optional, two real things depend on this exact layout: `docker-compose.yml` (local dev, optional) builds the other two repos via relative paths (`../golang-gin-realworld-example-app`, `../angular-realworld-example-app`), and step 7 below `cd`s between all three the same way. You should end up with:
 ```
 conduit/
   conduit-platform/
@@ -47,7 +59,10 @@ conduit/
   angular-realworld-example-app/
 ```
 
-**Cloned directly like this, you can stand up your own copy of the infrastructure against your own AWS account** - every step below through the app going live only needs your own AWS credentials, not any access to these GitHub repos beyond a public, read-only clone. What you *can't* do without an extra step first is push code or trigger the CI/CD pipeline yourself (step 7 onward) - that needs write access, which a plain clone doesn't give you. To get that too, fork these three repos into your own GitHub account first (preserves the code and the `realworld/` git submodule exactly), clone your fork instead of the URLs above, and set `GITHUB_ORG`/`BACKEND_REPO`/`FRONTEND_REPO`/`PLATFORM_REPO` in `deploy.env` (step 0 below) to match.
+**If you plan to use `docker-compose.yml` for local dev** (optional, and the only thing in this guide that actually builds an image on your own machine): the frontend repo has a git submodule (`realworld/`, shared theme assets) that neither `gh repo fork --clone` nor a plain `git clone` populates on its own - the frontend's own `Dockerfile` says as much in its own top comment. Initialize it once after cloning, or `docker build` fails partway through:
+```bash
+cd angular-realworld-example-app && git submodule update --init --recursive && cd ..
+```
 
 ### Install these first
 

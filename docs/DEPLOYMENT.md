@@ -2,9 +2,26 @@
 
 Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see `docs/design-decisions.md`: standing up real AWS infrastructure was a deliberate, separate decision from writing the code).
 
-Nothing in this guide is specific to any one person - it's written for whoever forked these three repos to their own GitHub account, into their own AWS account.
+These are the exact three repos this platform was built and tested against - the app-level fixes documented in `docs/design-decisions.md` (Postgres support, CORS, the runtime-configurable frontend, and the rest) live in these specific forks, not in a fresh fork of upstream `gothinkster`/`realworld-apps`. Cloning them directly is the only way to actually reproduce what's described here, rather than a generic RealWorld deployment that happens to look similar.
 
 **Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see `docs/cost-estimate.md` (~$246/mo, ~$8/day for `dev`).
+
+**Contents**
+- [Prerequisites](#prerequisites)
+  - [Get the three repos](#get-the-three-repos)
+  - [Install these first](#install-these-first)
+- [0. Configure your deployment](#0-configure-your-deployment)
+- [1. Bootstrap remote Terraform state](#1-bootstrap-remote-terraform-state)
+- [2. Point `live/` at the new backend](#2-point-live-at-the-new-backend)
+- [3. Apply Terraform - this is the real infrastructure](#3-apply-terraform---this-is-the-real-infrastructure)
+- [4. Bridge Terraform outputs into GitHub](#4-bridge-terraform-outputs-into-github)
+- [5. Create the cross-repo dispatch token (manual - can't be automated)](#5-create-the-cross-repo-dispatch-token-manual---cant-be-automated)
+- [6. Install the platform add-ons](#6-install-the-platform-add-ons)
+- [7. Push your code to GitHub](#7-push-your-code-to-github)
+- [8. Let the real pipeline deploy the backend, then the frontend](#8-let-the-real-pipeline-deploy-the-backend-then-the-frontend)
+- [9. Verify end to end](#9-verify-end-to-end)
+- [Tearing down](#tearing-down)
+- [Tearing down the state bucket itself (optional, and truly last)](#tearing-down-the-state-bucket-itself-optional-and-truly-last)
 
 ---
 
@@ -17,9 +34,9 @@ Clone all three **as siblings under the same parent directory** - not optional, 
 ```bash
 mkdir -p ~/conduit && cd ~/conduit
 
-git clone https://github.com/<your-github-username>/conduit-platform.git
-git clone https://github.com/<your-github-username>/golang-gin-realworld-example-app.git
-git clone https://github.com/<your-github-username>/angular-realworld-example-app.git
+git clone https://github.com/mashiofu/conduit-platform.git
+git clone https://github.com/mashiofu/golang-gin-realworld-example-app.git
+git clone https://github.com/mashiofu/angular-realworld-example-app.git
 ```
 
 You should end up with:
@@ -30,7 +47,7 @@ conduit/
   angular-realworld-example-app/
 ```
 
-(Renamed a fork? Fine - just use the name you actually used, and set it in `deploy.env` in step 0 below; `BACKEND_REPO`/`FRONTEND_REPO`/`PLATFORM_REPO` are exactly what make that configurable.)
+**Cloned directly like this, you can stand up your own copy of the infrastructure against your own AWS account** - every step below through the app going live only needs your own AWS credentials, not any access to these GitHub repos beyond a public, read-only clone. What you *can't* do without an extra step first is push code or trigger the CI/CD pipeline yourself (step 7 onward) - that needs write access, which a plain clone doesn't give you. To get that too, fork these three repos into your own GitHub account first (preserves the code and the `realworld/` git submodule exactly), clone your fork instead of the URLs above, and set `GITHUB_ORG`/`BACKEND_REPO`/`FRONTEND_REPO`/`PLATFORM_REPO` in `deploy.env` (step 0 below) to match.
 
 ### Install these first
 

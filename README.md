@@ -30,7 +30,7 @@ docs/
 
 ## Reproducing this from scratch
 
-**Dev is currently applied and running** (staging/prod are not) - see `docs/design-decisions.md` for why the apply decision was made separately from, and after, validating the code, and `docs/cost-estimate.md` for the actual running rate. **`docs/DEPLOYMENT.md` is the complete, step-by-step guide** for standing this up in your own account - every command in order, including the manual GitHub steps (a fine-grained PAT for cross-repo dispatch) that can't be automated, and the teardown order that actually matters (Helm before Terraform, or the ALB the Load Balancer Controller created gets orphaned and blocks the VPC from deleting).
+**Dev has been applied and tested end to end against real AWS** (staging/prod have not) - see `docs/design-decisions.md` for why the apply decision was made separately from, and after, validating the code, and `docs/cost-estimate.md` for what that actually cost. **`docs/DEPLOYMENT.md` is the complete, step-by-step guide** for standing this up in your own account - every command in order, including the manual GitHub steps (a fine-grained PAT for cross-repo dispatch) that can't be automated, and the teardown order that actually matters (Helm before Terraform, or the ALB the Load Balancer Controller created gets orphaned and blocks the VPC from deleting).
 
 ## Where to start reading
 

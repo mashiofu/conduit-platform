@@ -1,6 +1,6 @@
 # Cost Estimate
 
-Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev is currently applied and running** (staging/prod are not) - the ~$230/mo row below is real, ongoing spend, not a projection.
+Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev has been applied and tested end to end against real AWS** (staging/prod have not) - the ~$230/mo row below reflects real spend actually incurred, not just a projection.
 
 | | dev | staging | prod |
 |---|---:|---:|---:|

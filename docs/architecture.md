@@ -33,6 +33,7 @@ flowchart TB
     CW["CloudWatch Logs<br/>+ Container Insights"]
 
     User -->|"① HTTP: load the app"| ALBf --> Frontend
+    Frontend -.env.js in that response bakes in the backend's ALB hostname.-> User
     User -->|"② HTTP: every API call, straight from the browser's JS"| ALBb --> Backend
     Backend --> RDS
     Backend --> Redis
@@ -47,7 +48,7 @@ Both frontend and backend are containerized and run on EKS, each in its own name
 
 ### How the frontend and backend actually connect
 
-**The frontend pod and backend pod never talk to each other over the network - there's no line for that above because there's no such connection.** The only thing that connects them is the browser, in two separate steps:
+**The frontend pod and backend pod never talk to each other over the network - the dotted line above goes from the frontend back to the browser, not to the backend, because that's the only connection that actually exists.** The two tiers are linked only through the browser, in two separate steps:
 
 ```mermaid
 sequenceDiagram

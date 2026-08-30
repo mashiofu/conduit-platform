@@ -82,7 +82,6 @@ Everything below was caught by actually running something - a build, a test, a r
 - AWS WAF in front of either ALB
 - A custom domain, ACM certificate, and HTTPS for either tier
 - A reverse-proxy frontend (nginx forwarding `/api/*` to the backend Service instead of the browser calling the backend's ALB directly) - would remove the need for CORS entirely and let the backend's ALB be fully private; see the architecture trade-off above for why the direct-call model was kept instead
-- Actually executing the backup/restore runbook against live infrastructure (written, not drilled)
 - The forked frontend's own `Security Tests` (XSS sanitization) and `Playwright Tests` (error-handling flows) currently fail - both are bugs in the app's own logic, not this project's infra/CI/CD, and the task brief is explicit that the app itself isn't evaluated. Left as-is rather than debugging Angular component/sanitization internals, which is a different skill area than everything else this repo covers.
 - A live pod/node-kill self-healing demonstration
 - Automatic ratcheting of the k6 performance baseline (currently a deliberate, human-reviewed commit - see `scripts/k6/compare-baseline.sh`)

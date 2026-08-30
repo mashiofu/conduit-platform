@@ -50,4 +50,4 @@ aws rds restore-db-instance-from-db-snapshot \
 
 ## Recovering the frontend
 
-No S3 bucket to recover an object from any more - the frontend is a container image now (see `docs/design-decisions.md`), on the same immutable-ECR-tag model as the backend. "I need last week's frontend back" means redeploying an older `sha-<commit>` tag, exactly the same mechanism (and the same command) as rolling back the backend - see `runbooks/incident-response.md`'s rollback section, which covers both tiers.
+The frontend is a container image, on the same immutable-ECR-tag model as the backend (see `docs/design-decisions.md`). "I need last week's frontend back" means redeploying an older `sha-<commit>` tag, exactly the same mechanism (and the same command) as rolling back the backend - see `runbooks/incident-response.md`'s rollback section, which covers both tiers.

@@ -3,9 +3,8 @@
 # IngressGroup - simpler to reason about than coordinating path routing
 # across two separately-deployed Helm releases, at the cost of a second
 # ALB (~$16-20/mo, same trade-off backend already accepts for its own).
-# Same HTTP-only caveat as the backend's Ingress applies here too now
-# that CloudFront (which supplied free HTTPS termination) is retired -
-# see docs/design-decisions.md.
+# Same HTTP-only caveat as the backend's Ingress applies here too -
+# see docs/design-decisions.md's HTTPS entry.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

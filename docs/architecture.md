@@ -43,7 +43,7 @@ flowchart TB
     eks -.container logs.-> CW
 ```
 
-Both frontend and backend are containerized and run on EKS, each in its own namespace and behind its own ALB - the frontend moved off S3/CloudFront (see `docs/design-decisions.md` for that trade-off, and for why each tier gets its own namespace rather than sharing `default`). Postgres and Redis are both managed services, not in-cluster state, so the cluster itself needs no backup story beyond redeploying from Helmfile (see `runbooks/backup-restore.md`).
+Both frontend and backend are containerized and run on EKS, each in its own namespace and behind its own ALB (see `docs/design-decisions.md` for that trade-off, and for why each tier gets its own namespace rather than sharing `default`). Postgres and Redis are both managed services, not in-cluster state, so the cluster itself needs no backup story beyond redeploying from Helmfile (see `runbooks/backup-restore.md`).
 
 ## CI/CD
 

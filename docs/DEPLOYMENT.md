@@ -155,7 +155,7 @@ The backend/frontend repos need to notify `conduit-platform` when they've built 
 
 ## 6. Install the platform add-ons
 
-Everything except the backend and frontend themselves - both get their first real deploy in step 8, through the actual CI/CD pipeline, not by hand here (the frontend is a container on EKS like the backend, not a static S3/CloudFront build - see `docs/design-decisions.md`).
+Everything except the backend and frontend themselves - both are containers on EKS and get their first real deploy in step 8, through the actual CI/CD pipeline, not by hand here.
 
 ```bash
 cd ../helm
@@ -220,7 +220,7 @@ curl http://<hostname-from-above>/api/ping/
 # Frontend - open in a browser
 kubectl get ingress conduit-frontend -n conduit-frontend
 ```
-Open that hostname in a browser and use the app - register, create an article, favorite something. Unlike the old S3/CloudFront setup, this should actually work end to end now: both tiers are plain HTTP ALBs, so there's no HTTPS-frontend-calling-HTTP-backend mixed-content mismatch to hang on (see `docs/design-decisions.md`'s HTTPS entry - neither tier has TLS, which is still the known, deliberately-deferred gap, it just no longer manifests as a stuck "Loading articles..." screen the way it did when the frontend was CloudFront-served).
+Open that hostname in a browser and use the app - register, create an article, favorite something. Both tiers are plain HTTP ALBs (no TLS on either yet - see `docs/design-decisions.md`'s HTTPS entry for that deliberately-deferred gap), so there's no mixed-content mismatch between them to worry about.
 
 To confirm the backend specifically, independent of the browser:
 ```bash

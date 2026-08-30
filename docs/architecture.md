@@ -33,7 +33,7 @@ flowchart TB
     CW["CloudWatch Logs<br/>+ Container Insights"]
 
     User -->|"① HTTP: load the app"| ALBf --> Frontend
-    Frontend -.env.js in that response bakes in the backend's ALB hostname.-> User
+    Frontend -.->|"env.js in that response bakes in the backend's ALB hostname"| User
     User -->|"② HTTP: every API call, straight from the browser's JS"| ALBb --> Backend
     Backend --> RDS
     Backend --> Redis
@@ -44,26 +44,7 @@ flowchart TB
     eks -.container logs.-> CW
 ```
 
-Both frontend and backend are containerized and run on EKS, each in its own namespace and behind its own ALB (see `docs/design-decisions.md` for that trade-off, and for why each tier gets its own namespace rather than sharing `default`). Postgres and Redis are both managed services, not in-cluster state, so the cluster itself needs no backup story beyond redeploying from Helmfile (see `runbooks/backup-restore.md`).
-
-### How the frontend and backend actually connect
-
-**The frontend pod and backend pod never talk to each other over the network - the dotted line above goes from the frontend back to the browser, not to the backend, because that's the only connection that actually exists.** The two tiers are linked only through the browser, in two separate steps:
-
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant F as Frontend ALB + pods
-    participant K as Backend ALB + pods
-
-    B->>F: ① GET / (load the app)
-    F-->>B: index.html, JS bundle, env.js<br/>(env.js has the backend's ALB hostname baked in)
-    Note over B: Angular now runs in the browser,<br/>with the backend's URL in hand
-    B->>K: ② every /api/... call, straight from that JS
-    K-->>B: JSON
-```
-
-`env.js` gets that hostname from the frontend's own `docker-entrypoint.d` script reading it out of SSM at container startup - the backend's deploy publishes it there once its own ALB exists (see the CI/CD diagram's `publishes backend ALB hostname to SSM` step). So the two tiers are connected exactly twice: once at deploy time (backend's URL flows to the frontend via SSM, not a live request) and once at runtime (the browser calls both, directly, one after the other) - never by one pod calling the other. This is also why the backend needs its own CORS handling and its own internet-facing ALB rather than being reachable only from inside the cluster - see `docs/design-decisions.md`'s entry on this for the trade-off and the more private alternative it gives up.
+Both frontend and backend are containerized and run on EKS, each in its own namespace and behind its own ALB (see `docs/design-decisions.md` for that trade-off, and for why each tier gets its own namespace rather than sharing `default`). The frontend pod and backend pod never talk to each other directly - the dotted arrow above (frontend back to browser) and the ② arrow (browser to backend) are the whole connection: the browser loads the app from the frontend, gets the backend's URL baked into that response, and calls the backend itself from there (see `docs/design-decisions.md` for why this isn't proxied through the frontend instead). Postgres and Redis are both managed services, not in-cluster state, so the cluster itself needs no backup story beyond redeploying from Helmfile (see `runbooks/backup-restore.md`).
 
 ## CI/CD
 

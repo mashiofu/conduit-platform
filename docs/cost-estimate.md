@@ -1,6 +1,6 @@
 # Cost Estimate
 
-Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. Nothing in this project has been applied yet, so nothing here has actually been spent.
+Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev is currently applied and running** (staging/prod are not) - the ~$230/mo row below is real, ongoing spend, not a projection.
 
 | | dev | staging | prod |
 |---|---:|---:|---:|
@@ -13,7 +13,7 @@ Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes a
 | S3 + CloudFront + ECR + Secrets Manager + CloudWatch Logs | ~$15 | ~$15 | ~$20 |
 | **Total (continuous)** | **~$230/mo (~$7.50/day)** | **~$255/mo (~$8.50/day)** | **~$595/mo (~$20/day)** |
 
-**All three running simultaneously: ~$1,080/mo (~$36/day).** That number is the actual reason this project defaults to local Terraform state and never auto-applies on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to.
+**All three running simultaneously: ~$1,080/mo (~$36/day).** That number is the actual reason `terraform.yml` gates every `apply` behind a GitHub Environment approval rather than auto-applying on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to. State itself is real and remote (S3, versioned, locked) regardless of which environments are actually up - that's a separate concern from whether the infrastructure those environments describe is running.
 
 ## What actually drives the difference between environments
 

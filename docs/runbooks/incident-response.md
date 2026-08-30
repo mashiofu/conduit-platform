@@ -21,9 +21,11 @@ Push-based CD (see `design-decisions.md`) means there's no GitOps revert to clic
 
 **Option A - re-deploy the previous image tag** (seconds, no rebuild):
 ```bash
-# From conduit-platform, or trigger deploy-backend.yml manually with:
-#   client_payload: { environment: "<env>", image_tag: "<previous known-good sha-tag>" }
-gh workflow run deploy-backend.yml -f environment=<env> -f image_tag=<previous-tag>
+# deploy-backend.yml only takes repository_dispatch, not workflow_dispatch -
+# there's no `gh workflow run` for it. Fire the dispatch event directly instead,
+# the same way cd.yml's own "Trigger deploy" step does:
+gh api repos/<GITHUB_ORG>/conduit-platform/dispatches --input - <<< \
+  '{"event_type":"backend-deploy","client_payload":{"environment":"<env>","image_tag":"<previous-known-good-sha-tag>"}}'
 ```
 (Find the previous tag from ECR: `aws ecr describe-images --repository-name conduit-<env>-backend --query 'sort_by(imageDetails,& imagePushedAt)[-5:].imageTags'`.)
 

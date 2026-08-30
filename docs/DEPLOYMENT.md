@@ -40,7 +40,7 @@ conduit/
 | [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) | v2 | Everything - Terraform's provider, `aws eks update-kubeconfig`, every verification step. Configure it with credentials broad enough to create IAM roles/policies, VPCs, EKS, RDS, etc. - a personal sandbox account with admin access is the realistic expectation here, not a tightly-scoped IAM user |
 | [Helm](https://helm.sh/docs/intro/install/) | 3.12+ (built/tested against 4.2.4) | Helmfile's underlying engine |
 | [Helmfile](https://github.com/helmfile/helmfile#installation) | built/tested against 1.7.4 | Installing/upgrading every chart in `helm/` |
-| [helm-diff plugin](https://github.com/databus23/helm-diff) - `helm plugin install https://github.com/databus23/helm-diff --verify=false` | any recent version | `helmfile apply`/`diff` shell out to `helm diff` internally to compute what would change - this isn't a built-in Helm command, and `helmfile lint`/`template` don't need it, so it's easy to not notice it's missing until the first real `apply`. The `--verify=false` is because this plugin doesn't publish the provenance files Helm 4's default plugin verification expects - not a reason to distrust it, just a widely-used plugin that hasn't caught up to a newer Helm requirement yet |
+| [helm-diff plugin](https://github.com/databus23/helm-diff) - `helm plugin install https://github.com/databus23/helm-diff --version v3.15.11 --verify=false` | v3.15.11 specifically, not "whatever's latest" | `helmfile apply`/`diff` shell out to `helm diff` internally to compute what would change - this isn't a built-in Helm command, and `helmfile lint`/`template` don't need it, so it's easy to not notice it's missing until the first real `apply`. The `--verify=false` is because this plugin doesn't publish the provenance files Helm 4's default plugin verification expects. The version pin is deliberate too, not just caution: `deploy-backend.yml`'s CI hit this directly - `helm plugin install` grabbing latest helm-diff against an older, pinned Helm failed to load at all ("unknown field platformHooks" in the plugin's manifest, a schema field that Helm version didn't know about yet). v3.15.11 is the exact version confirmed working against Helm v4.2.4 throughout this project's own testing. |
 | [kubectl](https://kubernetes.io/docs/tasks/tools/) | within one minor version of 1.34 (the cluster's version, per standard kubectl/server skew policy) | Verifying pods/ingress after a deploy |
 | [gh CLI](https://cli.github.com/), authenticated (`gh auth login`) | any recent version | The GitHub Environment sync script, setting secrets, watching workflow runs |
 | [jq](https://jqlang.github.io/jq/) | any recent version | Parsing `terraform output -json` in the sync scripts |
@@ -221,9 +221,22 @@ curl http://<hostname-from-above>/api/ping/
 aws cloudfront list-distributions \
   --query "DistributionList.Items[?Comment=='conduit-dev frontend'].DomainName" --output text
 ```
-Open that CloudFront URL, register a user, create an article, favorite something - that exercises frontend → ALB → backend → RDS and Redis all at once.
+Opening that CloudFront URL in a browser and trying to actually use it will currently stick on "Loading articles..." forever - not a bug in what you just deployed, but the known, deliberately-deferred gap in `docs/design-decisions.md` (no HTTPS on the backend's ALB; the browser silently tries to upgrade the frontend's API calls to HTTPS and hangs against a listener that doesn't exist). Confirm the deploy actually works end to end via `curl` instead, which isn't affected:
+```bash
+BASE="http://<hostname-from-above>/api"
+curl -sS "$BASE/tags"
+curl -sS -X POST "$BASE/users" -H "Content-Type: application/json" \
+  -d '{"user":{"username":"verify","email":"verify@example.com","password":"verifyPass123"}}'
+# use the returned token to create an article, etc. - see design-decisions.md's
+# HTTPS entry for what closes this gap for real browser use.
+```
 
-**Grafana**: `kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80`, open `localhost:3000`, log in `admin` / `prom-operator` (the chart's default - change it if this cluster lives longer than a quick demo), open the **Conduit Backend** dashboard.
+**Grafana**: this chart version doesn't ship a fixed default password (`adminPassword` is commented out in its own values) - it generates a random one per install, in the same Secret the chart's own `helm install` NOTES point at:
+```bash
+kubectl get secret --namespace monitoring -l app.kubernetes.io/component=admin-secret -o jsonpath="{.items[0].data.admin-password}" | base64 --decode; echo
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+```
+Open `localhost:3000`, log in as `admin` with that password, open the **Conduit Backend** dashboard. No Ingress/LoadBalancer is set up for Grafana - port-forward is the only way in as things stand (see `docs/design-decisions.md` if you want to change that).
 
 ## Tearing down
 

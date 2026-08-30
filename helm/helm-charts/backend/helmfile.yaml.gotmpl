@@ -1,6 +1,12 @@
 releases:
   - name: conduit-backend
-    namespace: default
+    # Its own namespace, not default - every other component in this
+    # cluster already gets one (kube-system, external-secrets,
+    # monitoring, amazon-cloudwatch); the app workloads sitting in bare
+    # `default` was the real inconsistency, independent of whether
+    # frontend/backend shared one namespace or not.
+    namespace: conduit-backend
+    createNamespace: true
     # Local chart path, not a repositories.yaml.gotmpl entry - this is our
     # own chart source (../../backend-chart), not a third-party one.
     chart: ../../backend-chart

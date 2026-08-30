@@ -97,7 +97,7 @@ jobs:
         id: alb
         run: |
           for i in $(seq 1 20); do
-            HOSTNAME=$(kubectl get ingress conduit-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            HOSTNAME=$(kubectl get ingress conduit-frontend -n conduit-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
             if [ -n "$HOSTNAME" ]; then
               break
             fi

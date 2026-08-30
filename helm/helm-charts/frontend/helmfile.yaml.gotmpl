@@ -1,6 +1,9 @@
 releases:
   - name: conduit-frontend
-    namespace: default
+    # Its own namespace, not default - same reasoning as the backend's
+    # release (see its own comment).
+    namespace: conduit-frontend
+    createNamespace: true
     # Local chart path, not a repositories.yaml.gotmpl entry - this is our
     # own chart source (../../frontend-chart), not a third-party one.
     chart: ../../frontend-chart

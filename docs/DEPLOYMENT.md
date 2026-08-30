@@ -241,29 +241,35 @@ Open `localhost:3000`, log in as `admin` with that password, open the **Conduit 
 
 ## Tearing down
 
-**Order matters, in both directions.** Helm-managed resources have to go first, or the ALB the Load Balancer Controller created gets orphaned and blocks the VPC from deleting. But one Helm-managed resource has to be dealt with *before* that, while the cluster (and the EBS CSI driver running on it) still exists to actually process it:
+**Order matters, in both directions.** Helm-managed resources have to go first, or the ALB the Load Balancer Controller created gets orphaned and blocks the VPC from deleting. And one Helm-managed resource needs an explicit extra step *right after* that, still while the cluster (and the EBS CSI driver running on it) exists to actually process it - not before, and not skipped:
 
 ```bash
-# 1. Prometheus's PVC first, specifically - kube-prometheus-stack's
+# 1. The usual Helm-managed resources first:
+cd conduit-platform/helm
+helmfile -e dev destroy
+
+# 2. Prometheus's PVC specifically, right after - kube-prometheus-stack's
 #    Prometheus is a StatefulSet, and Kubernetes deliberately does NOT
 #    delete a StatefulSet's own PVC when the StatefulSet is removed (a
-#    data-loss safeguard, not a bug). `helmfile destroy` below will
-#    happily remove the Prometheus release and leave this PVC - and the
-#    real EBS volume behind it - orphaned. Terraform never created or
-#    tracks this volume (it's entirely Helm/Kubernetes-managed), so
-#    `terraform destroy` won't touch it either - it just keeps costing
-#    money, silently, forever, unless it's deleted here, now, while the
-#    cluster's EBS CSI driver is still running to actually action the
-#    delete.
+#    data-loss safeguard, not a bug), so step 1 above just left this
+#    PVC - and the real EBS volume behind it - orphaned. Terraform never
+#    created or tracks this volume (it's entirely Helm/Kubernetes-
+#    managed), so `terraform destroy` won't touch it either - it just
+#    keeps costing money, silently, forever, unless it's deleted here,
+#    now, while the cluster's EBS CSI driver is still running to
+#    actually action the delete.
+#
+#    This has to come AFTER step 1, not before: a PVC still mounted by a
+#    running pod is protected from deletion by Kubernetes itself
+#    (the kubernetes.io/pvc-protection finalizer) - it'll sit in
+#    Terminating and never actually clear until the pod that's using it
+#    is gone, which only happens once step 1 removes the Prometheus
+#    StatefulSet.
 kubectl delete pvc -n monitoring -l app.kubernetes.io/name=prometheus
 
 # Confirm it's actually gone before moving on - both should return nothing:
 kubectl get pvc -A
 kubectl get pv
-
-# 2. Now the rest of the Helm-managed resources:
-cd conduit-platform/helm
-helmfile -e dev destroy
 
 # 3. Then Terraform:
 cd ../terraform/live

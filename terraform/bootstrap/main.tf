@@ -1,5 +1,5 @@
 # Bootstrap: provisions ONLY the S3 bucket that every other root module
-# (terraform/envs/*) uses as its remote state backend.
+# (terraform/live/) uses as its remote state backend.
 #
 # This has to be its own tiny root module with local state - you can't
 # store a bucket's state inside the bucket it's creating. It changes
@@ -7,9 +7,9 @@
 # deliberate, documented trade-off rather than more infrastructure to
 # solve a one-time problem.
 #
-# Not run yet as of this writing - see docs/design-decisions.md for why
-# (the team deferred the real-AWS-apply decision independently of writing
-# the code). To actually bootstrap an environment:
+# Applied and used as the real backend for dev's entire build, deploy,
+# and teardown - see docs/design-decisions.md and docs/cost-estimate.md.
+# To bootstrap a fresh environment yourself:
 #
 #   cd terraform/bootstrap
 #   terraform init
@@ -18,6 +18,17 @@
 # then point terraform/live/backend.hcl at the bucket name it outputs
 # (see backend.hcl.example there) and uncomment the backend "s3" block in
 # live/versions.tf.
+#
+# Tearing down: this bucket is deliberately not force_destroy - state
+# history shouldn't be casually destroyable - so a plain `terraform
+# destroy` here fails on a non-empty (versioned) bucket. Purge every
+# object version and delete marker first (`aws s3api list-object-versions`
+# / `delete-objects`, the same approach `docs/design-decisions.md`
+# documents for the old CDN frontend bucket), confirm the bucket is
+# actually empty, then destroy - and only ever as the true last step,
+# once terraform/live/'s own destroy has already finished and been
+# verified, since live/'s backend depends on this bucket existing for
+# every command up to that point.
 
 resource "aws_s3_bucket" "state" {
   bucket = var.state_bucket_name

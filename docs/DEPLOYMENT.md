@@ -285,3 +285,32 @@ aws eks describe-cluster --name conduit-dev-cluster   # should error: cluster no
 ```
 
 The `alb-logs` S3 bucket destroys cleanly on its own (`force_destroy = true` - everything in it is auto-generated and already expires after 30 days, unlike the old CDN frontend bucket this project used to have, which needed its versions and delete markers purged by hand first). The Terraform state bucket (`bootstrap/`) is untouched by `terraform destroy` in `live/` - it's a separate root module, deliberately, and tearing it down (if wanted at all) is its own explicit step in `bootstrap/`, not implied by this one.
+
+## Tearing down the state bucket itself (optional, and truly last)
+
+Only once `terraform destroy` in `live/` has finished **and** been verified empty by the checks above - `live/`'s backend depends on this bucket existing for every command up to that point, so destroying it any earlier breaks the teardown you're in the middle of, not just this one.
+
+```bash
+cd conduit-platform/terraform/bootstrap
+```
+
+This bucket is deliberately not `force_destroy` - state history shouldn't be casually destroyable - so a plain `terraform destroy` fails on a non-empty (versioned) bucket, same as the old CDN bucket used to. Purge every object version and delete marker first:
+
+```bash
+BUCKET="<your TF_STATE_BUCKET>"
+aws s3api list-object-versions --bucket "$BUCKET" --output json | \
+  python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+objs = [{'Key': v['Key'], 'VersionId': v['VersionId']} for v in d.get('Versions', [])]
+objs += [{'Key': v['Key'], 'VersionId': v['VersionId']} for v in d.get('DeleteMarkers', [])]
+print(json.dumps({'Objects': objs, 'Quiet': True}))
+" > /tmp/purge.json
+aws s3api delete-objects --bucket "$BUCKET" --delete file:///tmp/purge.json
+
+# Confirm empty before destroying - both should print 0:
+aws s3api list-object-versions --bucket "$BUCKET" --query 'length(Versions[])'
+aws s3api list-object-versions --bucket "$BUCKET" --query 'length(DeleteMarkers[])'
+
+terraform destroy -var="state_bucket_name=$BUCKET"
+```

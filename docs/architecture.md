@@ -50,8 +50,6 @@ Both frontend and backend are containerized and run on EKS, each in its own name
 
 ```mermaid
 flowchart TB
-    TF["terraform.yml (conduit-platform)<br/>plan on PR, gated apply"]
-
     subgraph backendRepo["golang-gin-realworld-example-app"]
         direction TB
         BCI["ci.yml<br/>test + Trivy scan"]
@@ -73,8 +71,9 @@ flowchart TB
     BCD -->|push image| ECR
     FCD -->|push image| ECR
 
-    subgraph platformRepo["conduit-platform (deploy workflows)"]
+    subgraph platformRepo["conduit-platform"]
         direction TB
+        TF["terraform.yml<br/>plan on PR, gated apply"]
         DeployB["deploy-backend.yml<br/>helmfile apply + k6 gate"]
         DeployF["deploy-frontend.yml<br/>helmfile apply + smoke test"]
         DeployB -.->|publishes backend ALB hostname to SSM| DeployF
@@ -93,6 +92,6 @@ flowchart TB
     DeployF -->|helmfile apply| EKS
 ```
 
-`terraform.yml` (top) is what actually creates the EKS cluster and ECR repos every other workflow here depends on (the two dotted `provisions` arrows) - drawn outside the `conduit-platform` box below even though it lives in that same repo, because it isn't a peer of the two deploy workflows in any pipeline sense: it runs on its own schedule (plan automatically on any PR touching `terraform/`, apply only via a manual, environment-gated `workflow_dispatch`), not triggered by either app repo or by a deploy. Each app repo's `ci.yml` and `cd.yml` are likewise two independent workflows both triggered by the same push to `main`, not one invoking the other - drawn in sequence because `cd.yml` only ever ships a commit `ci.yml` already tested against, not because one calls the other.
+`terraform.yml` is what actually creates the EKS cluster and ECR repos every other workflow here depends on (the two dotted `provisions` arrows) - it runs on its own schedule (plan automatically on any PR touching `terraform/`, apply only via a manual, environment-gated `workflow_dispatch`), not triggered by either app repo or by a deploy. Each app repo's `ci.yml` and `cd.yml` are likewise two independent workflows both triggered by the same push to `main`, not one invoking the other - drawn in sequence because `cd.yml` only ever ships a commit `ci.yml` already tested against, not because one calls the other.
 
 Two IAM roles do all the AWS-side work in `conduit-platform`, and only there: **`terraform-ci`** (broad, runs Terraform) and **`platform-ci`** (EKS-scoped only, runs `helmfile apply`). Neither app repo's CI role can touch the cluster - see `design-decisions.md` for why that split exists and what it costs.

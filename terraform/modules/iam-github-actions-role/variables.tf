@@ -36,24 +36,6 @@ variable "ecr_pull_only_repository_arns" {
   default     = []
 }
 
-variable "s3_read_bucket_arn" {
-  description = "A foreign S3 bucket this role may read (list + get) but not write - for staging/prod's frontend-ci role to read dev's already-built assets during promotion, without granting write access to a bucket it doesn't own."
-  type        = string
-  default     = null
-}
-
-variable "frontend_bucket_arn" {
-  description = "S3 bucket ARN this role may sync built frontend assets to."
-  type        = string
-  default     = null
-}
-
-variable "cloudfront_distribution_arn" {
-  description = "CloudFront distribution ARN this role may invalidate after a deploy."
-  type        = string
-  default     = null
-}
-
 variable "eks_describe_cluster" {
   description = "Grant eks:DescribeCluster/ListClusters (needed for `aws eks update-kubeconfig`). Scoped to \"*\" rather than one cluster's ARN - this role is created before the eks module in the dependency graph (the eks module's access entry needs *this* role's ARN as an input), so scoping to the exact cluster ARN here would be circular. DescribeCluster is a low-risk read-only action; the real gate is the EKS access entry the eks module grants this role, which is cluster-specific."
   type        = bool

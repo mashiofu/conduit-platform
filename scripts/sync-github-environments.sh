@@ -113,14 +113,4 @@ if [ "$ENV" = "dev" ]; then
   set_repo_var "$FRONTEND_REPO" ECR_REPOSITORY_URL_DEV "$(val ecr_frontend_repository_url)"
 fi
 
-# --- Superseded by the containerized frontend above (see
-# docs/design-decisions.md) - left in place only until module.cdn_frontend
-# itself is retired in a follow-up change, not because anything still
-# reads these. ---
-set_env_var "$FRONTEND_REPO" "$ENV" FRONTEND_BUCKET_NAME "$(val frontend_bucket_name)"
-set_env_var "$FRONTEND_REPO" "$ENV" CLOUDFRONT_DISTRIBUTION_ID "$(val frontend_distribution_id)"
-if [ "$ENV" = "dev" ]; then
-  set_repo_var "$FRONTEND_REPO" DEV_FRONTEND_BUCKET_NAME "$(val frontend_bucket_name)"
-fi
-
 echo "done: $ENV synced to all three repos"

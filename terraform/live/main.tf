@@ -110,8 +110,6 @@ locals {
 
   cfg = local.env_config[local.valid_workspace ? local.environment : "dev"]
 
-  frontend_bucket_name = "${local.name_prefix}-frontend-${var.github_org}"
-
   # The backend's ALB hostname, written here by conduit-platform's deploy
   # workflow after each `helmfile apply` (kubectl get ingress ...) - not a
   # Terraform resource, since the ALB itself is created by the AWS Load
@@ -131,7 +129,6 @@ locals {
   # artifacts during promotion (see the app repos' promote.yml).
   dev_ecr_repository_arn          = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.live.account_id}:repository/${var.project}-dev-backend"
   dev_ecr_frontend_repository_arn = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.live.account_id}:repository/${var.project}-dev-frontend"
-  dev_frontend_bucket_arn         = "arn:aws:s3:::${var.project}-dev-frontend-${var.github_org}"
 }
 
 data "aws_caller_identity" "live" {}
@@ -205,14 +202,6 @@ module "github_role_frontend" {
   github_repos       = [var.frontend_github_repo]
   github_environment = local.cfg.github_environment
 
-  # S3/CloudFront perms kept for now alongside the new ECR ones below -
-  # module.cdn_frontend itself is still in place during the transition
-  # to a containerized frontend (see its own comment). Remove both
-  # together once that transition is confirmed working.
-  frontend_bucket_arn         = module.cdn_frontend.bucket_arn
-  cloudfront_distribution_arn = module.cdn_frontend.distribution_arn
-  s3_read_bucket_arn          = local.environment == "dev" ? null : local.dev_frontend_bucket_arn
-
   ssm_read_parameter_arn = local.backend_url_parameter_arn
 
   ecr_repository_arns = [module.ecr_frontend.repository_arn]
@@ -259,15 +248,6 @@ module "github_role_platform_ci" {
   ssm_write_parameter_arn = local.backend_url_parameter_arn
 
   tags = local.common_tags
-}
-
-module "cdn_frontend" {
-  source     = "../modules/cdn-frontend"
-  depends_on = [terraform_data.workspace_guard]
-
-  name_prefix = local.name_prefix
-  bucket_name = local.frontend_bucket_name
-  tags        = local.common_tags
 }
 
 module "rds" {

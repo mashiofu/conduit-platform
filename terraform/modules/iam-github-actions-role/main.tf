@@ -91,21 +91,6 @@ data "aws_iam_policy_document" "permissions" {
   }
 
   dynamic "statement" {
-    for_each = var.frontend_bucket_arn != null ? [1] : []
-    content {
-      sid    = "FrontendBucketSync"
-      effect = "Allow"
-      actions = [
-        "s3:ListBucket",
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-      ]
-      resources = [var.frontend_bucket_arn, "${var.frontend_bucket_arn}/*"]
-    }
-  }
-
-  dynamic "statement" {
     for_each = length(var.ecr_pull_only_repository_arns) > 0 ? [1] : []
     content {
       sid    = "ECRPullOnlyForPromotion"
@@ -116,26 +101,6 @@ data "aws_iam_policy_document" "permissions" {
         "ecr:BatchGetImage",
       ]
       resources = var.ecr_pull_only_repository_arns
-    }
-  }
-
-  dynamic "statement" {
-    for_each = var.s3_read_bucket_arn != null ? [1] : []
-    content {
-      sid       = "S3ReadOnlyForPromotion"
-      effect    = "Allow"
-      actions   = ["s3:ListBucket", "s3:GetObject"]
-      resources = [var.s3_read_bucket_arn, "${var.s3_read_bucket_arn}/*"]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = var.cloudfront_distribution_arn != null ? [1] : []
-    content {
-      sid       = "CloudFrontInvalidate"
-      effect    = "Allow"
-      actions   = ["cloudfront:CreateInvalidation"]
-      resources = [var.cloudfront_distribution_arn]
     }
   }
 

@@ -30,18 +30,6 @@ output "github_actions_terraform_role_arn" {
   value = module.github_role_terraform_ci.role_arn
 }
 
-output "frontend_bucket_name" {
-  value = module.cdn_frontend.bucket_name
-}
-
-output "frontend_distribution_domain_name" {
-  value = module.cdn_frontend.distribution_domain_name
-}
-
-output "frontend_distribution_id" {
-  value = module.cdn_frontend.distribution_id
-}
-
 output "rds_endpoint" {
   value = module.rds.endpoint
 }

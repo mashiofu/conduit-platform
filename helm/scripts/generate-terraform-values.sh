@@ -28,6 +28,7 @@ VALUES_JSON="$(jq -c '
     clusterAutoscalerRoleArn: .eks_cluster_autoscaler_role_arn.value,
     ecrBackendRepositoryUrl:  .ecr_backend_repository_url.value,
     ecrFrontendRepositoryUrl: .ecr_frontend_repository_url.value,
+    albAccessLogsBucketName:  .alb_access_logs_bucket_name.value,
     rdsSecretArn:             .rds_master_user_secret_arn.value,
     rdsEndpoint:              .rds_endpoint.value,
     rdsDatabaseName:          .rds_database_name.value,

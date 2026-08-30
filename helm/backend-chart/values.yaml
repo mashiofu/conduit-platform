@@ -39,6 +39,7 @@ networkPolicy:
 
 ingress:
   enabled: true
+  accessLogsBucket: "" # set from terraform output alb_access_logs_bucket_name
 
 serviceMonitor:
   enabled: true

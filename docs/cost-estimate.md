@@ -16,6 +16,8 @@ Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes a
 
 Each tier gets its own ALB (see `docs/design-decisions.md` for why the frontend is containerized rather than served from a CDN) - a static-asset CDN would have been cheaper than a second load balancer, but wasn't what the take-home brief's literal wording called for. Frontend's own compute cost is close to zero on top of this - its pods (2× 50m CPU / 64Mi memory) run on node capacity the cluster already has for the backend, not new nodes. The EBS row is what backs Prometheus's actual metrics storage (see `docs/design-decisions.md`) - small in absolute terms next to everything else here, but a real, easy-to-miss line item once Prometheus stops using an ephemeral `emptyDir`.
 
+Two more additions aren't in the table above yet: VPC Flow Logs (CloudWatch Logs ingestion, REJECT-only) and an S3 bucket for ALB access logs (see `docs/design-decisions.md`) - both written and validated, not yet applied. Rough added cost once they are: ~$1-2/mo per environment, small enough next to everything else here that it's not worth its own row until it's confirmed live rather than estimated.
+
 **All three running simultaneously: ~$1,138/mo (~$38/day).** That number is the actual reason `terraform.yml` gates every `apply` behind a GitHub Environment approval rather than auto-applying on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to. State itself is real and remote (S3, versioned, locked) regardless of which environments are actually up - that's a separate concern from whether the infrastructure those environments describe is running.
 
 ## What actually drives the difference between environments

@@ -14,6 +14,10 @@ output "ecr_frontend_repository_url" {
   value = module.ecr_frontend.repository_url
 }
 
+output "alb_access_logs_bucket_name" {
+  value = aws_s3_bucket.alb_access_logs.id
+}
+
 output "github_actions_backend_role_arn" {
   value = module.github_role_backend.role_arn
 }

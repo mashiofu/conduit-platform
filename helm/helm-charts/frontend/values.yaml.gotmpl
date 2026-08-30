@@ -7,3 +7,6 @@
 # are merged in and would silently never see them.
 image:
   repository: {{ .Values.ecrFrontendRepositoryUrl }}
+
+ingress:
+  accessLogsBucket: {{ .Values.albAccessLogsBucketName }}

@@ -7,6 +7,9 @@
 image:
   repository: {{ .Values.ecrBackendRepositoryUrl }}
 
+ingress:
+  accessLogsBucket: {{ .Values.albAccessLogsBucketName }}
+
 replicaCount: {{ .Values.backend.minReplicas }}
 
 autoscaling:

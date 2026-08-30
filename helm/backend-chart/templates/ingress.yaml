@@ -13,6 +13,9 @@ metadata:
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
     alb.ingress.kubernetes.io/healthcheck-path: /api/ping/
+    {{- if .Values.ingress.accessLogsBucket }}
+    alb.ingress.kubernetes.io/load-balancer-attributes: access_logs.s3.enabled=true,access_logs.s3.bucket={{ .Values.ingress.accessLogsBucket }},access_logs.s3.prefix=backend
+    {{- end }}
 spec:
   rules:
     - http:

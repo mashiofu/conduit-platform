@@ -152,6 +152,30 @@ jobs:
           done
           echo "hostname=$HOSTNAME" >> "$GITHUB_OUTPUT"
 
+      # A hostname in the Ingress status only means the Load Balancer
+      # Controller knows what the ALB *will* be called - AWS reports the
+      # underlying ALB itself as "provisioning" for a few minutes after
+      # that on a genuinely new ALB, and its DNS name isn't resolvable
+      # until that finishes. Never actually hit here (this ALB has been
+      # reused across every deploy since this project's very first one,
+      # so it long ago finished provisioning) - added after hitting it
+      # live on the frontend's own first-ever deploy, which reaches this
+      # same kind of check much sooner in its pipeline (no SSM publish/
+      # k6 install steps ahead of it to absorb the same few minutes by
+      # coincidence). Same latent gap here, just never triggered yet.
+      - name: Wait for the ALB to actually be reachable
+        if: steps.alb.outputs.hostname != ''
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 5 "http://${{ steps.alb.outputs.hostname }}/api/ping/" >/dev/null 2>&1; then
+              exit 0
+            fi
+            echo "ALB not reachable yet, probably still provisioning... ($i/20)"
+            sleep 15
+          done
+          echo "::error::ALB never became reachable" >&2
+          exit 1
+
       # Swap back to terraform-ci: the next step reads Terraform state
       # (terraform output) and writes the SSM parameter - platform-ci
       # (assumed above, and still active otherwise) is narrowly scoped

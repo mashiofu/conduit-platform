@@ -44,7 +44,7 @@ release means adding one such directory and one line in the top-level
 `helmfile.yaml.gotmpl`'s `helmfiles:` list - not editing a single
 growing file. `backend` and `frontend` each install into their own
 namespace (`conduit-backend`/`conduit-frontend`, `createNamespace: true`)
-rather than `default` - see `docs/design-decisions.md` for why.
+rather than `default` - see [`docs/design-decisions.md`](../docs/design-decisions.md) for why.
 `cluster-storage` is listed first, deliberately: `monitoring`'s
 Prometheus PVC needs the `gp3` `StorageClass` it creates to already
 exist, and nested `helmfiles:` entries apply in the order listed.
@@ -63,7 +63,7 @@ credential in its values.
 
 ## Usage
 
-**Never run a bare `helmfile apply` (or `diff`) against `backend`/`frontend`.** Both releases need `image.tag` set via `--set image.tag=<git-sha>` - only `deploy-backend.yml`/`deploy-frontend.yml` do that; a local apply with no `-l` filter re-applies them anyway, silently falling back to each chart's own `image.tag: "latest"` default, a tag that's never actually pushed to ECR (only `sha-<commit>` tags are). Hit live exactly this way - see `docs/design-decisions.md`'s bug list. Scope any local command to the add-ons only, the same way `docs/DEPLOYMENT.md`'s own step 6 does:
+**Never run a bare `helmfile apply` (or `diff`) against `backend`/`frontend`.** Both releases need `image.tag` set via `--set image.tag=<git-sha>` - only `deploy-backend.yml`/`deploy-frontend.yml` do that; a local apply with no `-l` filter re-applies them anyway, silently falling back to each chart's own `image.tag: "latest"` default, a tag that's never actually pushed to ECR (only `sha-<commit>` tags are). Hit live exactly this way - see [`docs/design-decisions.md`](../docs/design-decisions.md)'s bug list. Scope any local command to the add-ons only, the same way [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md)'s own step 6 does:
 ```bash
 helmfile -e dev -l name!=conduit-backend -l name!=conduit-frontend apply
 ```

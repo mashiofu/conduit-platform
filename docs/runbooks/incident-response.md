@@ -23,7 +23,7 @@
 
 ## Rolling back a bad deploy (backend or frontend)
 
-Push-based CD (see `design-decisions.md`) means there's no GitOps revert to click. Both tiers are on the identical immutable-ECR-tag model, so the same two options apply to either - just swap `backend`/`frontend` in the event type and repo name.
+Push-based CD (see [`design-decisions.md`](../design-decisions.md)) means there's no GitOps revert to click. Both tiers are on the identical immutable-ECR-tag model, so the same two options apply to either - just swap `backend`/`frontend` in the event type and repo name.
 
 **Option A - re-deploy the previous image tag** (seconds, no rebuild):
 ```bash

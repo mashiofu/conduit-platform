@@ -1,10 +1,10 @@
 # Deploying From Scratch
 
-Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see `docs/design-decisions.md`: standing up real AWS infrastructure was a deliberate, separate decision from writing the code).
+Every command below, in the order that actually works. Written to be run by a human in their own terminal - nothing here has been executed for you (see [`docs/design-decisions.md`](design-decisions.md): standing up real AWS infrastructure was a deliberate, separate decision from writing the code).
 
-These are the exact three repos this platform was built and tested against - the app-level fixes documented in `docs/design-decisions.md` (Postgres support, CORS, the runtime-configurable frontend, and the rest) live in these specific forks, not in a fresh fork of upstream `gothinkster`/`realworld-apps`. Cloning them directly is the only way to actually reproduce what's described here, rather than a generic RealWorld deployment that happens to look similar.
+These are the exact three repos this platform was built and tested against - the app-level fixes documented in [`docs/design-decisions.md`](design-decisions.md) (Postgres support, CORS, the runtime-configurable frontend, and the rest) live in these specific forks, not in a fresh fork of upstream `gothinkster`/`realworld-apps`. Cloning them directly is the only way to actually reproduce what's described here, rather than a generic RealWorld deployment that happens to look similar.
 
-**Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see `docs/cost-estimate.md` (~$246/mo, ~$8/day for `dev`).
+**Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see [`docs/cost-estimate.md`](cost-estimate.md) (~$246/mo, ~$8/day for `dev`).
 
 **Contents**
 - [Prerequisites](#prerequisites)
@@ -237,7 +237,7 @@ curl http://<hostname-from-above>/api/ping/
 # Frontend - open in a browser
 kubectl get ingress conduit-frontend -n conduit-frontend
 ```
-Open that hostname in a browser and use the app - register, create an article, favorite something. Both tiers are plain HTTP ALBs (no TLS on either yet - see `docs/design-decisions.md`'s HTTPS entry for that deliberately-deferred gap), so there's no mixed-content mismatch between them to worry about.
+Open that hostname in a browser and use the app - register, create an article, favorite something. Both tiers are plain HTTP ALBs (no TLS on either yet - see [`docs/design-decisions.md`](design-decisions.md)'s HTTPS entry for that deliberately-deferred gap), so there's no mixed-content mismatch between them to worry about.
 
 To confirm the backend specifically, independent of the browser:
 ```bash
@@ -254,7 +254,7 @@ curl -sS -X POST "$BASE/users" -H "Content-Type: application/json" \
 kubectl get secret --namespace monitoring -l app.kubernetes.io/component=admin-secret -o jsonpath="{.items[0].data.admin-password}" | base64 --decode; echo
 kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 ```
-Open `localhost:3000`, log in as `admin` with that password, open the **Conduit Backend** dashboard. No Ingress/LoadBalancer is set up for Grafana - port-forward is the only way in as things stand (see `docs/design-decisions.md` if you want to change that).
+Open `localhost:3000`, log in as `admin` with that password, open the **Conduit Backend** dashboard. No Ingress/LoadBalancer is set up for Grafana - port-forward is the only way in as things stand (see [`docs/design-decisions.md`](design-decisions.md) if you want to change that).
 
 ## Tearing down
 
@@ -293,7 +293,7 @@ cd ../terraform/live
 terraform destroy
 ```
 
-**After it finishes, verify nothing was left behind rather than trust the exit code alone** - this project has hit exactly this class of surprise before (see `docs/design-decisions.md`):
+**After it finishes, verify nothing was left behind rather than trust the exit code alone** - this project has hit exactly this class of surprise before (see [`docs/design-decisions.md`](design-decisions.md)):
 ```bash
 # Should return nothing:
 aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes[].[VolumeId,Tags]'

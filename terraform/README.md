@@ -68,7 +68,7 @@ per-environment to configure in the backend itself.
 
 One-time, per AWS account - standing up the state bucket is itself a
 real AWS action, deliberately separate from `live/`'s own apply (see
-`docs/design-decisions.md`). See `docs/DEPLOYMENT.md` step 1 for the
+[`docs/design-decisions.md`](../docs/design-decisions.md)). See [`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) step 1 for the
 full walkthrough; the commands themselves:
 
 ```bash

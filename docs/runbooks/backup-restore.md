@@ -13,7 +13,7 @@
 | Tier | Backed up? | Mechanism |
 |---|---|---|
 | RDS Postgres | Yes | Automated daily snapshots + point-in-time recovery (PITR), retention set per environment in `terraform/live/main.tf`'s `env_config` (`backup_retention_days` in `modules/rds`) |
-| Frontend container images | Yes | Immutable ECR tags (`sha-<commit>`, same as the backend's) - no tag is ever overwritten, so "recovery" is redeploying an older tag rather than restoring from a snapshot. See `runbooks/incident-response.md`'s rollback section. |
+| Frontend container images | Yes | Immutable ECR tags (`sha-<commit>`, same as the backend's) - no tag is ever overwritten, so "recovery" is redeploying an older tag rather than restoring from a snapshot. See [`runbooks/incident-response.md`](incident-response.md)'s rollback section. |
 | Terraform state bucket | Yes | Versioning, lifecycle-capped at 90 days (kept longer - it's the audit trail of every infra change, and tiny) |
 | ElastiCache Redis | **No, deliberately** | It's a read-through cache for anonymous GET responses (see the backend's `cache` package), never a source of truth. Losing it costs some latency until it re-warms, not data. A snapshot/restore story here would be solving a problem that doesn't exist. |
 | EKS cluster / in-cluster state | **No backup needed** | Nothing in the cluster is stateful - no PVs, no StatefulSets. Every workload is either stateless (the backend) or itself backed by a managed service (Postgres, Redis) or reconstructible from Helmfile (all the platform add-ons). Re-running `helmfile apply` against a freshly-created cluster reconstructs the entire platform layer from source. |
@@ -58,4 +58,4 @@ aws rds restore-db-instance-from-db-snapshot \
 
 ## Recovering the frontend
 
-The frontend is a container image, on the same immutable-ECR-tag model as the backend (see `docs/design-decisions.md`). "I need last week's frontend back" means redeploying an older `sha-<commit>` tag, exactly the same mechanism (and the same command) as rolling back the backend - see `runbooks/incident-response.md`'s rollback section, which covers both tiers.
+The frontend is a container image, on the same immutable-ECR-tag model as the backend (see [`docs/design-decisions.md`](../design-decisions.md)). "I need last week's frontend back" means redeploying an older `sha-<commit>` tag, exactly the same mechanism (and the same command) as rolling back the backend - see [`runbooks/incident-response.md`](incident-response.md)'s rollback section, which covers both tiers.

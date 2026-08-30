@@ -9,11 +9,13 @@ Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes a
 | NAT Gateway(s) | $33 (1 shared) | $33 (1 shared) | $99 (1 per AZ) |
 | RDS | $15 (t4g.micro, single-AZ) | $28 (t4g.small, single-AZ) | $145 (t4g.medium, **Multi-AZ**) |
 | ElastiCache | $12 (t4g.micro) | $24 (t4g.small) | $50 (t4g.medium) |
-| ALB | $20 | $20 | $25 |
-| S3 + CloudFront + ECR + Secrets Manager + CloudWatch Logs | ~$15 | ~$15 | ~$20 |
-| **Total (continuous)** | **~$230/mo (~$7.50/day)** | **~$255/mo (~$8.50/day)** | **~$595/mo (~$20/day)** |
+| ALB × 2 (backend + frontend) | $40 | $40 | $50 |
+| ECR (backend + frontend) + Secrets Manager + CloudWatch Logs | ~$12 | ~$12 | ~$15 |
+| **Total (continuous)** | **~$246/mo (~$8/day)** | **~$271/mo (~$9/day)** | **~$614/mo (~$20.50/day)** |
 
-**All three running simultaneously: ~$1,080/mo (~$36/day).** That number is the actual reason `terraform.yml` gates every `apply` behind a GitHub Environment approval rather than auto-applying on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to. State itself is real and remote (S3, versioned, locked) regardless of which environments are actually up - that's a separate concern from whether the infrastructure those environments describe is running.
+Frontend containerization (see `docs/design-decisions.md`) changed two of these rows: a second ALB replaced S3 + CloudFront (net cost goes up, not down - a static-asset CDN was actually cheaper than a second load balancer, but wasn't what the take-home brief's literal wording called for). Frontend's own compute cost is close to zero on top of this - its pods (2× 50m CPU / 64Mi memory) run on node capacity the cluster already has for the backend, not new nodes.
+
+**All three running simultaneously: ~$1,130/mo (~$38/day).** That number is the actual reason `terraform.yml` gates every `apply` behind a GitHub Environment approval rather than auto-applying on merge (see `docs/design-decisions.md`) - none of this should run continuously against a personal AWS account without a deliberate reason to. State itself is real and remote (S3, versioned, locked) regardless of which environments are actually up - that's a separate concern from whether the infrastructure those environments describe is running.
 
 ## What actually drives the difference between environments
 

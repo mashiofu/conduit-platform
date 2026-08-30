@@ -6,17 +6,18 @@
 flowchart TB
     User(("Browser"))
 
-    subgraph edge["Edge / CDN"]
-        CF["CloudFront"]
-        S3["S3 (private)<br/>built Angular SPA"]
-    end
-
     subgraph vpc["VPC - conduit-&lt;env&gt;"]
-        ALB["ALB<br/>(AWS Load Balancer Controller)"]
+        ALBf["ALB (frontend)<br/>(AWS Load Balancer Controller)"]
+        ALBb["ALB (backend)<br/>(AWS Load Balancer Controller)"]
 
         subgraph eks["EKS cluster"]
             direction TB
-            Backend["Backend pods (Go/Gin)<br/>HPA 2-10 replicas"]
+            subgraph nsFrontend["ns: conduit-frontend"]
+                Frontend["Frontend pods (nginx)<br/>HPA 2-4 replicas"]
+            end
+            subgraph nsBackend["ns: conduit-backend"]
+                Backend["Backend pods (Go/Gin)<br/>HPA 2-10 replicas"]
+            end
             Prom["kube-prometheus-stack<br/>Prometheus + Grafana + Alertmanager"]
             ESO["External Secrets Operator"]
         end
@@ -31,8 +32,8 @@ flowchart TB
     SSM["SSM Parameter Store<br/>(JWT_SECRET)"]
     CW["CloudWatch Logs<br/>+ Container Insights"]
 
-    User -->|HTTPS| CF --> S3
-    User -->|HTTP, API calls| ALB --> Backend
+    User -->|HTTP, static assets| ALBf --> Frontend
+    User -->|HTTP, API calls - direct from browser JS| ALBb --> Backend
     Backend --> RDS
     Backend --> Redis
     ESO -.reads.-> SM
@@ -42,7 +43,7 @@ flowchart TB
     eks -.container logs.-> CW
 ```
 
-The frontend is static assets on S3/CloudFront - no compute, no cluster involvement. The backend is the only thing running on EKS. Postgres and Redis are both managed services, not in-cluster state, which is why the cluster itself needs no backup story (see `runbooks/backup-restore.md`).
+Both frontend and backend are containerized and run on EKS, each in its own namespace and behind its own ALB - the frontend moved off S3/CloudFront (see `docs/design-decisions.md` for that trade-off, and for why each tier gets its own namespace rather than sharing `default`). Postgres and Redis are both managed services, not in-cluster state, so the cluster itself needs no backup story beyond redeploying from Helmfile (see `runbooks/backup-restore.md`).
 
 ## CI/CD
 
@@ -56,27 +57,29 @@ flowchart LR
 
     subgraph frontendRepo["angular-realworld-example-app"]
         FCI["ci.yml<br/>test + build"]
-        FCD["cd.yml<br/>build -> S3 (dev) -> CloudFront"]
-        FPromote["promote.yml<br/>copy assets, no rebuild"]
+        FCD["cd.yml<br/>build -> push ECR (dev)"]
+        FPromote["promote.yml<br/>copy image, no rebuild"]
     end
 
     subgraph platformRepo["conduit-platform"]
         TF["terraform.yml<br/>plan on PR, gated apply"]
-        Deploy["deploy-backend.yml<br/>helmfile apply + k6 gate"]
+        DeployB["deploy-backend.yml<br/>helmfile apply + k6 gate"]
+        DeployF["deploy-frontend.yml<br/>helmfile apply + smoke test"]
     end
 
-    ECR[("ECR")]
+    ECR[("ECR<br/>(backend + frontend repos)")]
     EKS[("EKS cluster")]
-    S3B[("S3 + CloudFront")]
 
     BCD -->|push image| ECR
-    BCD -->|repository_dispatch| Deploy
-    BPromote -->|repository_dispatch| Deploy
-    Deploy -->|helmfile apply| EKS
-    Deploy -.publishes ALB hostname to SSM.-> FCD
+    BCD -->|repository_dispatch| DeployB
+    BPromote -->|repository_dispatch| DeployB
+    DeployB -->|helmfile apply| EKS
+    DeployB -.publishes backend ALB hostname to SSM.-> DeployF
 
-    FCD --> S3B
-    FPromote --> S3B
+    FCD -->|push image| ECR
+    FCD -->|repository_dispatch| DeployF
+    FPromote -->|repository_dispatch| DeployF
+    DeployF -->|helmfile apply| EKS
 ```
 
 Two IAM roles do all the AWS-side work in `conduit-platform`, and only there: **`terraform-ci`** (broad, runs Terraform) and **`platform-ci`** (EKS-scoped only, runs `helmfile apply`). Neither app repo's CI role can touch the cluster - see `design-decisions.md` for why that split exists and what it costs.

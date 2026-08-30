@@ -214,16 +214,17 @@ gh run watch --repo "$GITHUB_ORG/$FRONTEND_REPO"
 
 ```bash
 # Backend directly
-kubectl get ingress conduit-backend
+kubectl get ingress conduit-backend -n conduit-backend
 curl http://<hostname-from-above>/api/ping/
 
 # Frontend - open in a browser
-aws cloudfront list-distributions \
-  --query "DistributionList.Items[?Comment=='conduit-dev frontend'].DomainName" --output text
+kubectl get ingress conduit-frontend -n conduit-frontend
 ```
-Opening that CloudFront URL in a browser and trying to actually use it will currently stick on "Loading articles..." forever - not a bug in what you just deployed, but the known, deliberately-deferred gap in `docs/design-decisions.md` (no HTTPS on the backend's ALB; the browser silently tries to upgrade the frontend's API calls to HTTPS and hangs against a listener that doesn't exist). Confirm the deploy actually works end to end via `curl` instead, which isn't affected:
+Open that hostname in a browser and use the app - register, create an article, favorite something. Unlike the old S3/CloudFront setup, this should actually work end to end now: both tiers are plain HTTP ALBs, so there's no HTTPS-frontend-calling-HTTP-backend mixed-content mismatch to hang on (see `docs/design-decisions.md`'s HTTPS entry - neither tier has TLS, which is still the known, deliberately-deferred gap, it just no longer manifests as a stuck "Loading articles..." screen the way it did when the frontend was CloudFront-served).
+
+To confirm the backend specifically, independent of the browser:
 ```bash
-BASE="http://<hostname-from-above>/api"
+BASE="http://<backend-hostname-from-above>/api"
 curl -sS "$BASE/tags"
 curl -sS -X POST "$BASE/users" -H "Content-Type: application/json" \
   -d '{"user":{"username":"verify","email":"verify@example.com","password":"verifyPass123"}}'

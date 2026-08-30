@@ -5,7 +5,7 @@
 | Tier | Backed up? | Mechanism |
 |---|---|---|
 | RDS Postgres | Yes | Automated daily snapshots + point-in-time recovery (PITR), retention set per environment in `terraform/live/main.tf`'s `env_config` (`backup_retention_days` in `modules/rds`) |
-| Frontend S3 bucket | Yes | Versioning (every deploy's objects recoverable), lifecycle-capped at 30 days of noncurrent versions |
+| Frontend container images | Yes | Immutable ECR tags (`sha-<commit>`, same as the backend's) - no tag is ever overwritten, so "recovery" is redeploying an older tag rather than restoring from a snapshot. See `runbooks/incident-response.md`'s rollback section. |
 | Terraform state bucket | Yes | Versioning, lifecycle-capped at 90 days (kept longer - it's the audit trail of every infra change, and tiny) |
 | ElastiCache Redis | **No, deliberately** | It's a read-through cache for anonymous GET responses (see the backend's `cache` package), never a source of truth. Losing it costs some latency until it re-warms, not data. A snapshot/restore story here would be solving a problem that doesn't exist. |
 | EKS cluster / in-cluster state | **No backup needed** | Nothing in the cluster is stateful - no PVs, no StatefulSets. Every workload is either stateless (the backend) or itself backed by a managed service (Postgres, Redis) or reconstructible from Helmfile (all the platform add-ons). Re-running `helmfile apply` against a freshly-created cluster reconstructs the entire platform layer from source. |
@@ -48,27 +48,6 @@ aws rds restore-db-instance-from-db-snapshot \
 
 **Nothing here writes back into Terraform state automatically.** A restore is an imperative, human-in-the-loop action; reconciling Terraform's view of the world with whichever instance is now "the real one" is a deliberate follow-up step, not something to script blindly during an incident.
 
-## Recovering an S3 object (frontend bucket)
+## Recovering the frontend
 
-Versioning means a deleted or overwritten object isn't gone - it's a noncurrent version:
-
-The bucket is named `conduit-<env>-frontend-<your GITHUB_ORG>` (see `deploy.env`) - `terraform output frontend_bucket_name` gives you the exact value for the environment you're in:
-
-```bash
-BUCKET="$(terraform -chdir=terraform/live output -raw frontend_bucket_name)"
-
-aws s3api list-object-versions --bucket "$BUCKET" --prefix <path>
-
-aws s3api copy-object \
-  --bucket "$BUCKET" \
-  --copy-source "$BUCKET/<path>?versionId=<version-id-from-above>" \
-  --key <path>
-```
-
-Then invalidate CloudFront for that path so cached edge copies don't keep serving the bad version:
-
-```bash
-aws cloudfront create-invalidation --distribution-id <id> --paths "/<path>"
-```
-
-In practice, the more common "I need last week's frontend back" scenario doesn't need any of this - re-run `promote.yml` (or `cd.yml`) with an older commit's built assets, since the actual source of truth is the git history, not the bucket.
+No S3 bucket to recover an object from any more - the frontend is a container image now (see `docs/design-decisions.md`), on the same immutable-ECR-tag model as the backend. "I need last week's frontend back" means redeploying an older `sha-<commit>` tag, exactly the same mechanism (and the same command) as rolling back the backend - see `runbooks/incident-response.md`'s rollback section, which covers both tiers.

@@ -10,6 +10,13 @@ resource "aws_ecr_repository" "this" {
     encryption_type = "KMS"
   }
 
+  # Every image in here is a CI-pushed build artifact, not something a
+  # human curated - same reasoning as the ALB-logs bucket's
+  # force_destroy. Without this, `terraform destroy` fails outright the
+  # first time this repo actually has images in it (RepositoryNotEmptyException) -
+  # hit live, on both repos, on the very first real teardown attempt.
+  force_delete = true
+
   tags = var.tags
 }
 

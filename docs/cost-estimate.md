@@ -1,6 +1,6 @@
 # Cost Estimate
 
-Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev has been applied and tested end to end against real AWS** (staging/prod have not) - the dev column below reflects real spend actually incurred, not just a projection, with one exception: the EBS row and part of the "ECR + ..." row's CloudWatch Logs cost include this session's latest additions (RDS/ElastiCache log exports, Prometheus's PVC), validated with `terraform plan`/`helmfile template` but not yet applied - about $1/mo of the dev total below, not yet real spend as of this writing.
+Rough, order-of-magnitude numbers for `us-east-1`, based on the instance sizes actually set in `terraform/live/main.tf`'s `env_config`. These are planning numbers, not a bill - actual cost depends on real traffic (data transfer, ALB LCUs, log volume) that can't be predicted from the Terraform alone. **Dev has been applied and tested end to end against real AWS** (staging/prod have not) - the dev column below reflects real spend actually incurred, not just a projection, including the EBS volume backing Prometheus's PVC (confirmed `Bound` and mounted, not just planned - see `docs/design-decisions.md`).
 
 | | dev | staging | prod |
 |---|---:|---:|---:|

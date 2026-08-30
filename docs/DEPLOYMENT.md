@@ -4,7 +4,7 @@ Every command below, in the order that actually works. Written to be run by a hu
 
 Nothing in this guide is specific to any one person - it's written for whoever forked these three repos to their own GitHub account, into their own AWS account.
 
-**Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see `docs/cost-estimate.md` (~$7.50/day for `dev`).
+**Total time: ~30-40 minutes**, almost all of it waiting for the EKS cluster to provision. **Real cost starts accruing the moment step 3 finishes** - see `docs/cost-estimate.md` (~$246/mo, ~$8/day for `dev`).
 
 ---
 
@@ -120,7 +120,7 @@ terraform workspace new dev      # if `dev` isn't in that list
 terraform apply
 ```
 
-Review the plan, type `yes`. This provisions the VPC, EKS cluster + node group, RDS, ElastiCache, ECR, every IAM role (trust-scoped to `$GITHUB_ORG`'s repos - this is where `deploy.env` actually matters, not just cosmetically), CloudFront/S3, the `JWT_SECRET` SSM parameter, and the CloudWatch saved queries - **~85 resources**. The EKS cluster + node group is what makes this slow (10-15 minutes is normal); everything else is fast.
+Review the plan, type `yes`. This provisions the VPC, EKS cluster + node group, RDS, ElastiCache, two ECR repos (backend + frontend), every IAM role (trust-scoped to `$GITHUB_ORG`'s repos - this is where `deploy.env` actually matters, not just cosmetically, plus the CloudWatch Observability addon's EKS Pod Identity role), the `JWT_SECRET` SSM parameter, and the CloudWatch saved queries - **~105 resources** (confirmed against this project's own `dev` state). The EKS cluster + node group is what makes this slow (10-15 minutes is normal); everything else is fast.
 
 When it finishes, sanity-check the cluster exists:
 ```bash
@@ -135,7 +135,7 @@ cd ../../scripts
 ./sync-github-environments.sh dev
 ```
 
-This creates/updates a `dev` GitHub Environment in all three repos (`$PLATFORM_REPO`, `$BACKEND_REPO`, `$FRONTEND_REPO` under `$GITHUB_ORG`) with the IAM role ARNs, ECR URL, S3 bucket name, and CloudFront distribution ID that each repo's workflows need. Requires `gh` authenticated (it already is) and `jq`.
+This creates/updates a `dev` GitHub Environment in all three repos (`$PLATFORM_REPO`, `$BACKEND_REPO`, `$FRONTEND_REPO` under `$GITHUB_ORG`) with the IAM role ARNs and each app's own ECR repo URL that its workflows need. Requires `gh` authenticated (it already is) and `jq`.
 
 ## 5. Create the cross-repo dispatch token (manual - can't be automated)
 

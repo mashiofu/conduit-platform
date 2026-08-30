@@ -3,7 +3,7 @@
 ```
 terraform/
   bootstrap/   # one-time: the S3 bucket that live/ uses as its remote state backend
-  modules/     # reusable building blocks (network, ecr, rds, elasticache, cdn-frontend, iam-*)
+  modules/     # reusable building blocks (network, ecr, rds, elasticache, eks, iam-*)
   live/        # the actual deployable root module - one config, three workspaces
 ```
 

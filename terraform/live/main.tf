@@ -155,10 +155,8 @@ module "ecr_backend" {
 
 # The frontend's own image repo, now that it's containerized and running
 # on EKS instead of a static S3/CloudFront build - see
-# docs/design-decisions.md. module.cdn_frontend (below) stays in place
-# for now, retired in a separate follow-up once this path is confirmed
-# working end to end, not removed in the same change that adds its
-# replacement.
+# docs/design-decisions.md. module.cdn_frontend was retired in a
+# follow-up commit once this path was confirmed working end to end.
 module "ecr_frontend" {
   source     = "../modules/ecr"
   depends_on = [terraform_data.workspace_guard]

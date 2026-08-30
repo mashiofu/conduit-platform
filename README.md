@@ -7,7 +7,7 @@ The platform layer for **Conduit** (a RealWorld/"Medium clone" app) - Terraform,
 | Repo | Owns |
 |---|---|
 | [`golang-gin-realworld-example-app`](https://github.com/mashiofu/golang-gin-realworld-example-app) (fork) | Backend API, its own Dockerfile, its own CI/CD |
-| [`angular-realworld-example-app`](https://github.com/mashiofu/angular-realworld-example-app) (fork) | Frontend SPA, its own CI/CD |
+| [`angular-realworld-example-app`](https://github.com/mashiofu/angular-realworld-example-app) (fork) | Frontend SPA, its own Dockerfile, its own CI/CD |
 | `conduit-platform` (this repo) | Terraform, Helm chart + Helmfile, observability-as-code, docs, runbooks - the platform team's repo |
 
 Each app repo owns its own build/test/deploy pipeline; **this repo is the only one with any credentials that touch the live cluster** (see `docs/design-decisions.md`). That split - app teams own their service, one platform repo owns the shared infra - is deliberate, not incidental.
@@ -16,7 +16,7 @@ Each app repo owns its own build/test/deploy pipeline; **this repo is the only o
 
 ```
 terraform/        AWS infrastructure - see terraform/README.md for the workspace workflow
-helm/             Platform add-ons (Helmfile) + the backend's own Helm chart - see helm/README.md
+helm/             Platform add-ons (Helmfile) + the backend/frontend Helm charts - see helm/README.md
 scripts/          Cross-repo automation (GitHub Environment sync)
 docs/
   DEPLOYMENT.md          the complete step-by-step guide to standing this up from scratch

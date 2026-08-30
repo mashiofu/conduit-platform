@@ -54,6 +54,12 @@ resource "aws_db_instance" "this" {
 
   multi_az = var.multi_az
 
+  # Centralizes this tier's own engine logs into CloudWatch alongside the
+  # pod logs the CloudWatch Observability addon already collects - without
+  # this, "all relevant logs from all tiers" quietly excluded the database
+  # tier's own logs (slow queries, connection errors) entirely.
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+
   backup_retention_period = var.backup_retention_days
   backup_window           = "07:00-08:00"
   maintenance_window      = "mon:08:30-mon:09:30"

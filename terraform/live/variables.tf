@@ -14,7 +14,7 @@ variable "project" {
 }
 
 variable "github_org" {
-  description = "GitHub org/user that owns the app repos (used to scope the OIDC trust policies, and to keep the frontend S3 bucket name globally unique). No default, deliberately - this is the one value that's genuinely different for every person deploying this, and defaulting it to whoever wrote the code would silently misconfigure everyone else's OIDC trust. Set via TF_VAR_github_org - see ../../deploy.env.example."
+  description = "GitHub org/user that owns the app repos (used to scope the OIDC trust policies). No default, deliberately - this is the one value that's genuinely different for every person deploying this, and defaulting it to whoever wrote the code would silently misconfigure everyone else's OIDC trust. Set via TF_VAR_github_org - see ../../deploy.env.example."
   type        = string
 
   validation {

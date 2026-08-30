@@ -49,38 +49,49 @@ Both frontend and backend are containerized and run on EKS, each in its own name
 ## CI/CD
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph backendRepo["golang-gin-realworld-example-app"]
+        direction TB
         BCI["ci.yml<br/>test + Trivy scan"]
         BCD["cd.yml<br/>build -> push ECR (dev)"]
         BPromote["promote.yml<br/>copy image, no rebuild"]
+        BCI -.->|both triggered by push to main| BCD
     end
 
     subgraph frontendRepo["angular-realworld-example-app"]
+        direction TB
         FCI["ci.yml<br/>test + build"]
         FCD["cd.yml<br/>build -> push ECR (dev)"]
         FPromote["promote.yml<br/>copy image, no rebuild"]
-    end
-
-    subgraph platformRepo["conduit-platform"]
-        TF["terraform.yml<br/>plan on PR, gated apply"]
-        DeployB["deploy-backend.yml<br/>helmfile apply + k6 gate"]
-        DeployF["deploy-frontend.yml<br/>helmfile apply + smoke test"]
+        FCI -.->|both triggered by push to main| FCD
     end
 
     ECR[("ECR<br/>(backend + frontend repos)")]
-    EKS[("EKS cluster")]
 
     BCD -->|push image| ECR
+    FCD -->|push image| ECR
+
+    subgraph platformRepo["conduit-platform"]
+        direction TB
+        TF["terraform.yml<br/>plan on PR, gated apply"]
+        DeployB["deploy-backend.yml<br/>helmfile apply + k6 gate"]
+        DeployF["deploy-frontend.yml<br/>helmfile apply + smoke test"]
+        DeployB -.->|publishes backend ALB hostname to SSM| DeployF
+    end
+
     BCD -->|repository_dispatch| DeployB
     BPromote -->|repository_dispatch| DeployB
-    DeployB -->|helmfile apply| EKS
-    DeployB -.publishes backend ALB hostname to SSM.-> DeployF
-
-    FCD -->|push image| ECR
     FCD -->|repository_dispatch| DeployF
     FPromote -->|repository_dispatch| DeployF
+
+    EKS[("EKS cluster")]
+
+    TF -.->|provisions| EKS
+    TF -.->|provisions| ECR
+    DeployB -->|helmfile apply| EKS
     DeployF -->|helmfile apply| EKS
 ```
+
+`terraform.yml` is what actually creates the EKS cluster and ECR repos every other workflow here depends on (the two dotted `provisions` arrows) - it runs on its own schedule (plan automatically on any PR touching `terraform/`, apply only via a manual, environment-gated `workflow_dispatch`), not as a step triggered by either app repo. Each app repo's `ci.yml` and `cd.yml` are likewise two independent workflows both triggered by the same push to `main`, not one invoking the other - drawn in sequence because `cd.yml` only ever ships a commit `ci.yml` already tested against, not because one calls the other.
 
 Two IAM roles do all the AWS-side work in `conduit-platform`, and only there: **`terraform-ci`** (broad, runs Terraform) and **`platform-ci`** (EKS-scoped only, runs `helmfile apply`). Neither app repo's CI role can touch the cluster - see `design-decisions.md` for why that split exists and what it costs.

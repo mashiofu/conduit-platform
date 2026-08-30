@@ -193,7 +193,15 @@ Everything except the backend and frontend themselves - both are containers on E
 cd ../helm
 aws eks update-kubeconfig --name conduit-dev-cluster --region "$AWS_REGION"
 ./scripts/generate-terraform-values.sh dev
-helmfile -e dev -l name!=conduit-backend -l name!=conduit-frontend apply --skip-diff-validation-on-install
+# The two conditions have to be one comma-separated selector, not two
+# separate -l flags - Helmfile ORs multiple -l flags together, it
+# doesn't AND them, so `-l name!=conduit-backend -l name!=conduit-frontend`
+# actually matches every release (conduit-backend satisfies "name !=
+# conduit-frontend", conduit-frontend satisfies "name != conduit-backend",
+# and OR only needs one to hold) - the opposite of the exclusion this is
+# trying to express. Confirmed directly with `helmfile -e dev -l ... list`
+# against both forms before trusting either.
+helmfile -e dev -l 'name!=conduit-backend,name!=conduit-frontend' apply --skip-diff-validation-on-install
 ```
 
 `--skip-diff-validation-on-install` matters here specifically for the AWS Load Balancer Controller chart: it bundles both a CRD (`IngressClassParams`) and an instance of it in the same release, and since nothing's ever been installed on a brand-new cluster, `helm-diff`'s K8s API validation has no way to recognize that CRD's kind yet when it tries to render a diff preview for the not-yet-installed release. This flag disables just that validation step for newly-installed releases - it still computes and shows a diff, unlike its blunter sibling `--skip-diff-on-install`.

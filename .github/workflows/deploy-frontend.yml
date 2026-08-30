@@ -1,0 +1,115 @@
+name: Deploy Frontend
+
+# Received from the frontend repo's cd.yml (see
+# angular-realworld-example-app/.github/workflows/cd.yml) after it has
+# already built, tested, and pushed an image - this workflow never
+# builds anything, it only deploys an image that already exists. Same
+# shape as deploy-backend.yml, see its own comments for the reasoning
+# behind each credential swap / flag choice; this file only calls out
+# what's actually different for the frontend.
+#
+# client_payload: { environment: "dev"|"staging"|"prod", image_tag: "<git sha>" }
+
+on:
+  repository_dispatch:
+    types: [frontend-deploy]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.client_payload.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.3"
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Install helm/helmfile
+        run: |
+          curl -fsSL -o helm.tar.gz https://get.helm.sh/helm-v4.2.4-linux-amd64.tar.gz
+          tar -xzf helm.tar.gz linux-amd64/helm
+          sudo mv linux-amd64/helm /usr/local/bin/helm
+          helm plugin install https://github.com/databus23/helm-diff --version 3.15.11 --verify=false
+          curl -fsSL -o helmfile.tar.gz https://github.com/helmfile/helmfile/releases/download/v1.7.4/helmfile_1.7.4_linux_amd64.tar.gz
+          tar -xzf helmfile.tar.gz helmfile
+          sudo mv helmfile /usr/local/bin/helmfile
+
+      - name: Configure AWS credentials (terraform-ci, to read Terraform state)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TERRAFORM_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: terraform init
+        working-directory: terraform/live
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=live/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="use_lockfile=true"
+
+      - name: Bridge Terraform outputs into Helmfile values
+        working-directory: helm
+        run: ./scripts/generate-terraform-values.sh ${{ github.event.client_payload.environment }}
+
+      - name: Get cluster name and this environment's backend URL
+        id: tf
+        working-directory: terraform/live
+        run: |
+          terraform workspace select ${{ github.event.client_payload.environment }}
+          echo "cluster_name=$(terraform output -raw eks_cluster_name)" >> "$GITHUB_OUTPUT"
+          # May not exist yet if the backend has never successfully deployed
+          # in this environment - apiUrl just stays empty in that case,
+          # same fallback the old S3-based env.js injection already had.
+          URL=$(aws ssm get-parameter --name "$(terraform output -raw backend_url_parameter_name)" --query 'Parameter.Value' --output text 2>/dev/null || true)
+          echo "backend_url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (platform-ci, for cluster access)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.PLATFORM_CI_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ steps.tf.outputs.cluster_name }} --region ${{ vars.AWS_REGION }}
+
+      - name: helmfile apply
+        working-directory: helm
+        # -l name=conduit-frontend is not optional - see
+        # deploy-backend.yml's own comment on the exact live incident
+        # this avoids (an unscoped --set clobbered a completely
+        # unrelated release's own image.tag field).
+        run: |
+          helmfile -e ${{ github.event.client_payload.environment }} apply \
+            -l name=conduit-frontend \
+            --set image.tag=${{ github.event.client_payload.image_tag }} \
+            --set apiUrl=${{ steps.tf.outputs.backend_url }}
+
+      - name: Discover the frontend's ALB hostname
+        id: alb
+        run: |
+          for i in $(seq 1 20); do
+            HOSTNAME=$(kubectl get ingress conduit-frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            if [ -n "$HOSTNAME" ]; then
+              break
+            fi
+            echo "waiting for the ALB hostname to be assigned... ($i/20)"
+            sleep 15
+          done
+          echo "hostname=$HOSTNAME" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        if: steps.alb.outputs.hostname != ''
+        run: |
+          curl -fsS "http://${{ steps.alb.outputs.hostname }}/healthz"
+          curl -fsS "http://${{ steps.alb.outputs.hostname }}/" | grep -qi "<title>"
+          echo "env.js:"
+          curl -fsS "http://${{ steps.alb.outputs.hostname }}/env.js"

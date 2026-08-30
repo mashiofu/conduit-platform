@@ -155,13 +155,13 @@ The backend/frontend repos need to notify `conduit-platform` when they've built 
 
 ## 6. Install the platform add-ons
 
-Everything except the backend itself - that gets its first real deploy in step 8, through the actual CI/CD pipeline, not by hand here.
+Everything except the backend and frontend themselves - both get their first real deploy in step 8, through the actual CI/CD pipeline, not by hand here (the frontend is a container on EKS like the backend, not a static S3/CloudFront build - see `docs/design-decisions.md`).
 
 ```bash
 cd ../helm
 aws eks update-kubeconfig --name conduit-dev-cluster --region "$AWS_REGION"
 ./scripts/generate-terraform-values.sh dev
-helmfile -e dev -l name!=conduit-backend apply --skip-diff-validation-on-install
+helmfile -e dev -l name!=conduit-backend -l name!=conduit-frontend apply --skip-diff-validation-on-install
 ```
 
 `--skip-diff-validation-on-install` matters here specifically for the AWS Load Balancer Controller chart: it bundles both a CRD (`IngressClassParams`) and an instance of it in the same release, and since nothing's ever been installed on a brand-new cluster, `helm-diff`'s K8s API validation has no way to recognize that CRD's kind yet when it tries to render a diff preview for the not-yet-installed release. This flag disables just that validation step for newly-installed releases - it still computes and shows a diff, unlike its blunter sibling `--skip-diff-on-install`.

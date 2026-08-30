@@ -58,3 +58,4 @@ aws:
   rdsDatabaseName: ""
   redisAddr: ""
   ssmJwtSecretPath: "" # e.g. /conduit/dev/JWT_SECRET - constructed, not a TF output (see values.yaml.gotmpl)
+  frontendOrigin: "" # e.g. https://d123.cloudfront.net - CORS allow-origin, empty means the backend sends no CORS headers at all

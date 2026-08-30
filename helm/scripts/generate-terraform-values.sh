@@ -35,7 +35,8 @@ OUT_FILE="$HELM_DIR/${ENV}.generated.yaml"
       rdsSecretArn:             .rds_master_user_secret_arn.value,
       rdsEndpoint:              .rds_endpoint.value,
       rdsDatabaseName:          .rds_database_name.value,
-      redisEndpoint:            .redis_endpoint.value
+      redisEndpoint:            .redis_endpoint.value,
+      frontendOrigin:           "https://\(.frontend_distribution_domain_name.value)"
     }
     | to_entries
     | map("\(.key): \(.value | tostring | @json)")

@@ -205,6 +205,27 @@ jobs:
           tar -xzf k6.tar.gz --strip-components=1 k6-v0.55.0-linux-amd64/k6
           sudo mv k6 /usr/local/bin/k6
 
+      - name: Warm up the deploy before measuring it
+        if: steps.alb.outputs.hostname != ''
+        env:
+          BASE_URL: http://${{ steps.alb.outputs.hostname }}/api
+        run: |
+          # Redis starts empty and RDS connections start cold on every
+          # fresh deploy - the very first requests are strictly slower
+          # than steady state (a cache miss straight to Postgres, plus
+          # first-time connection setup), which the k6 run right after
+          # this would otherwise measure and compare against a baseline
+          # that was never itself a cold-start number (see
+          # docs/design-decisions.md). A handful of unmeasured GETs
+          # against the same cache-friendly endpoints k6 exercises
+          # (/tags, /articles) warms both before anything gets recorded.
+          # Best-effort, not a gate - a warmup request failing doesn't
+          # fail the deploy.
+          for i in $(seq 1 10); do
+            curl -fsS -o /dev/null "$BASE_URL/tags" || true
+            curl -fsS -o /dev/null "$BASE_URL/articles?limit=20" || true
+          done
+
       - name: Smoke test + performance baseline probe
         if: steps.alb.outputs.hostname != ''
         working-directory: scripts/k6
